@@ -6,7 +6,7 @@
 #include "CMainFrame.h"
 #include "afxdialogex.h"
 
-#include "CFT2232.h"
+#include "CFtDevice.h"
 #include <shellapi.h>
 #include <initguid.h> 
 #include <Dbt.h>
@@ -62,8 +62,7 @@ BOOL CMainFrame::OnInitDialog()
 {
 	CExDialog::OnInitDialog();
 	AppEnvInit();
-	CFT2232::Scan();
-	MAX_PANNEL_NUM = CFT2232::m_DevNum/2;
+	MAX_PANNEL_NUM = 2;
 
 	// TODO:  在此添加额外的初始化
 	SetIcon(m_hIcon, TRUE);			// 设置大图标

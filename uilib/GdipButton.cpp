@@ -33,6 +33,8 @@ using namespace Gdiplus;
 #include "CGdiPlusBitmap.h"
 #include "MemDC.h"
 
+#pragma warning(disable:4244)
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #undef THIS_FILE

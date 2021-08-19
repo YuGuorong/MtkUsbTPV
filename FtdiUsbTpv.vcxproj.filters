@@ -33,30 +33,6 @@
     <ClInclude Include="pch.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="CFT2232.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="CMainFrame.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="CPannel.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="EnumSerial.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="ExDialog.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="ftd2xx.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="InvokeExternalExe.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="SubPanelDlg.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
     <ClInclude Include="util.h">
       <Filter>源文件</Filter>
     </ClInclude>
@@ -81,15 +57,39 @@
     <ClInclude Include="getopt.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="CFdtiDriver.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="CFtDevice.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="CMainFrame.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="CPannel.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="EnumSerial.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ExDialog.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ftd2xx.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="InvokeExternalExe.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="SubPanelDlg.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FtdiUsbTpv.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="pch.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="CFT2232.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="CMainFrame.cpp">
@@ -121,6 +121,12 @@
     </ClCompile>
     <ClCompile Include="uilib\SkinBtn.cpp">
       <Filter>uilib</Filter>
+    </ClCompile>
+    <ClCompile Include="CFtDevice.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="CFtdiDriver.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

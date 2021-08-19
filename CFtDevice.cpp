@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "CFT2232.h"
+#include "CFtDevice.h"
 #include "ftd2xx.h"
 
 
@@ -33,15 +33,13 @@
 #define DBG  printf 
 
 
-DWORD CFT2232::m_DevNum = 0;
-DWORD CFT2232::m_LgoicDev = 0;
-void* CFT2232::m_pDevList = NULL;
 DWORD dwClockDivisor = 0x00C8;		// 100khz
 
-CFT2232::CFT2232() 
+CFtDevice::CFtDevice(int ftID) 
 {
+	m_FtdiID = ftID;
 }
-CFT2232::~CFT2232()
+CFtDevice::~CFtDevice()
 {
 }
 
@@ -75,14 +73,16 @@ CFT2232::~CFT2232()
 
 	return status;
 }
-void CFT2232::GetGpio()
+void CFtDevice::GetGpio()
 {
 
 }
 
 
-void CFT2232::SetGpio(BYTE lb, BYTE hb) {
+void CFtDevice::SetGpio(BYTE lb, BYTE hb) {
 	int dwNumBytesToSend = 0;			//Clear output buffer
+	DWORD dwNumBytesSent = 0;
+	BYTE OutputBuffer[1024];			//Buffer to hold MPSSE commands and data to be sent to FT232H
 
 	// Set the idle states for the AD lines
 	OutputBuffer[dwNumBytesToSend++] = MID_SET_LOW_BYTE_DATA_BITS_CMD;	// Command to set directions of ADbus and data values for pins set as o/p
@@ -104,7 +104,7 @@ void CFT2232::SetGpio(BYTE lb, BYTE hb) {
 }
 
 
-LRESULT CFT2232::Read(void)
+LRESULT CFtDevice::Read(void)
 {
 	return S_OK;
 }
@@ -113,29 +113,29 @@ LRESULT CFT2232::Read(void)
 
 
 
-LRESULT CFT2232::Set(int con, int home, int kcol, int pwr)
+LRESULT CFtDevice::Set(int con, int home, int kcol, int pwr)
 {
 	return LRESULT(0);
 }
 
-LRESULT CFT2232::Set(int gpio)
+LRESULT CFtDevice::Set(int gpio)
 {
 	return LRESULT(0);
 }
 
-LRESULT CFT2232::SetAll(int raw)
+LRESULT CFtDevice::SetAll(int raw)
 {
 	return LRESULT(0);
 }
 
-LRESULT CFT2232::Open()
+LRESULT CFtDevice::Open()
 {
 	DWORD dwCount;
 	FT_STATUS ftStatus;
 	// Open the UM232H module by it's description in the EEPROM
 	// Note: See FT_OpenEX in the D2xx Programmers Guide for other options available
 	//ftStatus = FT_OpenEx("Dual RS232-HS B", FT_OPEN_BY_DESCRIPTION, &ftHandle);
-	ftStatus = FT_Open(m_chnId, &ftHandle);
+	ftStatus = FT_Open(m_FtdiID, &ftHandle);
 
 	// Check if Open was successful
 	if (ftStatus != FT_OK)
@@ -145,6 +145,15 @@ LRESULT CFT2232::Open()
 	}
 	else
 	{
+		int dwNumBytesToSend = 0;			//Clear output buffer
+		DWORD dwNumBytesSent = 0;
+		BYTE OutputBuffer[1024];			// Buffer to hold MPSSE commands and data to be sent to FT232H
+		BYTE InputBuffer[1024];				// Buffer to hold Data bytes read from FT232H
+		DWORD dwNumInputBuffer;			// Number of bytes which we want to read
+		DWORD dwNumBytesRead;			// Number of bytes actually read
+		DWORD ReadTimeoutCounter;		// Used as a software timeout counter when the code checks the Queue Status
+
+
 		// #########################################################################################
 		// After opening the device, Put it into MPSSE mode
 		// #########################################################################################
@@ -180,8 +189,8 @@ LRESULT CFT2232::Open()
 		// #########################################################################################
 		// Synchronise the MPSSE by sending bad command AB to it
 		// #########################################################################################
-
-		int dwNumBytesToSend = 0;																// Used as an index to the buffer
+		bool bCommandEchod;
+		dwNumBytesToSend = 0;																// Used as an index to the buffer
 		OutputBuffer[dwNumBytesToSend++] = 0xAB;											// Add an invalid command 0xAB
 		ftStatus = FT_Write(ftHandle, OutputBuffer, dwNumBytesToSend, &dwNumBytesSent);		// Send off the invalid command
 
@@ -281,95 +290,14 @@ LRESULT CFT2232::Open()
 	return S_OK;
 }
 
-LRESULT  CFT2232::Scan(void)
-{
-	DWORD devIndex = 0;
-	FT_STATUS ftStatus;
 
-	// ---------------------------------------------------------- -
-		// Does an FTDI device exist?
-		// -----------------------------------------------------------
-	printf("Checking for FTDI devices...\n");
-	ftStatus = FT_CreateDeviceInfoList(&m_LgoicDev);// Get the number of FTDI devices
-	if (ftStatus != FT_OK)// Did the command execute OK?
-	{
-		printf("Error in getting the number of devices\n");
-		return FT_INSUFFICIENT_RESOURCES;	 
-	}
-	if (m_LgoicDev < 1)// Exit if we don't see any
-	{
-		printf("There are no FTDI devices installed\n");
-		return FT_DEVICE_NOT_FOUND;		 
-	}
-	printf("%d FTDI devices channel found\n", m_LgoicDev);
-	printf("=========================================\n");
 
-	if (ftStatus == FT_OK) {
-		DWORD tempNumChannels = m_LgoicDev + 1;
-		FT_DEVICE_LIST_INFO_NODE* pDeviceList ;
 
-		pDeviceList = (FT_DEVICE_LIST_INFO_NODE*)malloc(sizeof(FT_DEVICE_LIST_INFO_NODE) * (tempNumChannels + 1));
-		if (NULL == pDeviceList)
-		{
-			return FT_INSUFFICIENT_RESOURCES;
-		}
-		/*get the devices information(FT_GetDeviceInfoList)*/
-		int combineDev = -1;
-		m_DevNum = 0;
-		ftStatus = FT_GetDeviceInfoList(pDeviceList, &tempNumChannels);
-		for (int i = 0; i < (int)tempNumChannels; i++) {
-			switch (pDeviceList[i].Type) {
-			case FT_DEVICE_2232H:
-			case FT_DEVICE_2232C:
-				if (combineDev < 0) {
-					printf("Device %d\n", m_DevNum);/* 0 if not open*/
-					combineDev = 2;
-					m_DevNum++;
-				}
-			case FT_DEVICE_4232H:
-				if (combineDev < 0) {
-					printf("Device %d\n", m_DevNum);/* 0 if not open*/
-					combineDev = 4;
-					m_DevNum++;
-				}
-			}
-			printf("Information on channel number %d:\n", (unsigned int)i);
-			const char* stype[] = {
-					"FT_DEVICE_232BM",
-					"FT_DEVICE_232AM",
-					"FT_DEVICE_100AX",
-					"FT_DEVICE_UNKNOWN",
-					"FT_DEVICE_2232C",
-					"FT_DEVICE_232R",
-					"FT_DEVICE_2232H",
-					"FT_DEVICE_4232H",
-					"FT_DEVICE_232H",
-					"FT_DEVICE_X_SERIES",
-			};
 
-			/*print the dev info*/
-			printf("		Flags=0x%x(%s)\n", pDeviceList[i].Flags, pDeviceList[i].Flags == FT_FLAGS_OPENED ? "FT_FLAGS_OPENED" : "FT_FLAGS_HISPEED");
-			printf("		Type=0x%x(%s)\n", pDeviceList[i].Type, stype[pDeviceList[i].Type]);
-			printf("		ID=0x%x\n", pDeviceList[i].ID);
-			printf("		LocId=0x%x\n", pDeviceList[i].LocId);
-			printf("		SerialNumber=%s\n", pDeviceList[i].SerialNumber);
-			printf("		Description=%s\n", pDeviceList[i].Description);
-			printf("		ftHandle=0x%x\n", (unsigned int)pDeviceList[i].ftHandle);/* 0 if not open*/
-			if (--combineDev <= 0) {
-				combineDev = -1;
-				printf("=========================================\n");
-			}
+CFtBoard::CFtBoard() {
 
-		}
-		free(pDeviceList);
-
-		// FT_ListDevices OK, product descriptions are in Buffer1 and Buffer2, and
-		// m_DevNum contains the number of devices connected
-		printf("Number of devices connected is: %d\n", m_DevNum);
-	}
-	else {
-		// FT_ListDevices failed
-	}
-	return S_OK;
 }
 
+CFtBoard::~CFtBoard()
+{
+}

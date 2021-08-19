@@ -7,7 +7,7 @@
 #include "CMainFrame.h"
 
 #include "getopt.h"
-#include "CFT2232.h"
+#include "CFtDevice.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -19,6 +19,20 @@
 CWinApp theApp;
 
 using namespace std;
+
+#define PARAM_INDEX    'i'
+#define PARRAM_CON     'c'
+#define PARRAM_HOME    'o'
+#define PARRAM_KCOL    'k'
+#define PARRAM_PWRKEY  'p'
+#define PARRAM_RAWVAL  'r'
+#define PARRAM_SETVAL  's'
+#define CMD_DISPLAY    'd'
+#define CMD_LISTDEV    'l'
+#define CMD_GUI        'u'
+#define CMD_VERSION    'v'
+#define CMD_HELP       'h'
+
 
 
 void showHelp(char * app)
@@ -44,82 +58,114 @@ void showHelp(char * app)
 }
 
 
+
+
 int main(int argc, char** argv)
 {
     int nRetCode = 0;
+    
+     
 
     HMODULE hModule = ::GetModuleHandle(nullptr);
 
-    if (hModule != nullptr)
-    {
-        // 初始化 MFC 并在失败时显示错误
-        if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0))
-        {
-            // TODO: 在此处为应用程序的行为编写代码。
-            wprintf(L"错误: MFC 初始化失败\n");
-            nRetCode = 1;
-        }
-        else
-        {
-
-            int opt;
-            int digit_optind = 0;
-            int option_index = 0;
-            const char* optstring = "vsdluhi:c:o:k:p:r";
-            static struct option long_options[] = {
-                {"index",  required_argument, NULL, 'i'},
-                {"con",    required_argument, NULL, 'c'},
-                {"home" ,  required_argument, NULL, 'o'},
-                {"kcol",   required_argument, NULL, 'k'},
-                {"pwrkey", required_argument, NULL, 'p'},
-                {"raw",    required_argument, NULL, 'r'},
-                {"set",    required_argument, NULL, 's'},
-                {"display",no_argument,       NULL, 'd'},
-                {"list",   no_argument,       NULL, 'l'},
-                {"gui",    no_argument,       NULL, 'u'},
-                {"version",no_argument,       NULL, 'v'},
-                {"help",   no_argument,       NULL, 'h'},
-                {0, 0, 0, 0}
-            };
-
-            
-            while ((opt = getopt_long(argc, argv, optstring, long_options, &option_index)) != -1)
-            {
-                switch (opt) {
-                case 'h':
-                    showHelp(argv[0]);
-                    break;
-                case 'v':
-                    printf("version : 1.0.0.1");
-                    break;
-                case 'l':
-                    CFT2232::Scan();
-                    break;
-                case 'u': {
-                    CMainFrame dlg;
-                    dlg.DoModal();
-                    }
-                    break;
-                case 's':
-                    break;
-                }
-                //printf("opt = %c\n", opt);
-                //printf("optarg = %s\n", optarg);
-                //printf("optind = %d\n", optind);
-                //printf("argv[optind - 1] = %s\n", argv[optind - 1]);
-                //printf("option_index = %d\n", option_index);
-            }
-
-            
-            //dlg.DoModal();
-        }
-    }
-    else
-    {
-        // TODO: 更改错误代码以符合需要
+    if (hModule == nullptr)
+    {   // TODO: 更改错误代码以符合需要
         wprintf(L"错误: GetModuleHandle 失败\n");
-        nRetCode = 1;
+        return 1;        
     }
+    
+    // 初始化 MFC 并在失败时显示错误
+    if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0))
+    {
+        // TODO: 在此处为应用程序的行为编写代码。
+        wprintf(L"错误: MFC 初始化失败\n");
+        return 1;
+    }
+    CFtdiDriver  drvFdti;
+    drvFdti.Scan(FALSE);
+    drvFdti.MountDevices();
 
-    return nRetCode;
+    
+    
+    if (argc <= 1) {
+        showHelp(argv[0]);
+        return 0;
+    }
+    int opt;
+    int digit_optind = 0;
+    int option_index = 0;
+    const char* optstring = "vsdluhi:c:o:k:p:r";
+    static struct option long_options[] = {
+        {"index",  required_argument, NULL, 'i'},
+        {"con",    required_argument, NULL, 'c'},
+        {"home" ,  optional_argument, NULL, 'o'},
+        {"kcol",   optional_argument, NULL, 'k'},
+        {"pwrkey", optional_argument, NULL, 'p'},
+        {"raw",    required_argument, NULL, 'r'},
+        {"set",    required_argument, NULL, 's'},
+        {"display",no_argument,       NULL, 'd'},
+        {"list",   no_argument,       NULL, 'l'},
+        {"gui",    no_argument,       NULL, 'u'},
+        {"version",no_argument,       NULL, 'v'},
+        {"help",   no_argument,       NULL, 'h'},
+        {0, 0, 0, 0}
+    };
+
+    int devidx = 0;
+    int con = 0;
+    map<char, int> cmdParam;
+    cmdParam[PARAM_INDEX] = 0;
+    cmdParam[PARRAM_CON] = 0;
+    //cmdParam[PARRAM_HOME] = 0;
+    //cmdParam[PARRAM_KCOL] = 0;
+    //cmdParam[PARRAM_PWRKEY] = 0;
+    //cmdParam[PARRAM_RAWVAL] = 0;
+    //cmdParam[PARRAM_SETVAL]=0;
+
+    while ((opt = getopt_long(argc, argv, optstring, long_options, &option_index)) != -1)
+    {
+        if (optarg != NULL)
+            cmdParam[opt] = atoi(optarg);
+
+        switch (opt) {
+
+        case PARRAM_HOME:
+        case PARRAM_KCOL:
+        case PARRAM_PWRKEY:
+        case PARRAM_RAWVAL:
+        case PARRAM_SETVAL:
+            break;
+        case CMD_DISPLAY:            {
+            int devid = (cmdParam.find(PARAM_INDEX) == cmdParam.end()) ? -1 : cmdParam[PARAM_INDEX];
+        }
+        break;
+
+        case CMD_LISTDEV:
+            //CFtDevice::Scan(true);
+            drvFdti.ShowDevices();
+            break;
+        case CMD_GUI: {
+            CMainFrame dlg;
+            dlg.DoModal();
+        }
+                    break;
+        case CMD_VERSION:
+            printf("version : 1.0.0.1\r\n");
+            break;
+        case CMD_HELP:
+        default:
+            showHelp(argv[0]);
+            break;
+        }
+        //printf("opt = %c\n", opt);
+        //printf("optarg = %s\n", optarg);
+        //printf("optind = %d\n", optind);
+        //printf("argv[optind - 1] = %s\n", argv[optind - 1]);
+        //printf("option_index = %d\n", option_index);
+    }
+           
+
+    return 0;
 }
+
+
