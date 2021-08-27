@@ -94,6 +94,7 @@ protected:
 	CToolTipCtrl*	m_pToolTip;
 	
 	void	InitToolTip();
+	void  ResetAllDC();
 
 	virtual void PreSubclassWindow();
 	virtual void DrawItem(LPDRAWITEMSTRUCT /*lpDrawItemStruct*/);
@@ -125,4 +126,8 @@ private:
 
 	CDC*	m_pCurBtn;		// current pointer to one of the above
 
+	int    m_cx, m_cy;
+public:
+	virtual BOOL DestroyWindow();
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 };

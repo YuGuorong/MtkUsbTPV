@@ -3,6 +3,8 @@
 #include <locale.h>
 #pragma warning(disable: 4996)   
 
+
+
 CPMutex::CPMutex(const TCHAR* name)
 {
 	memset(m_cMutexName, 0, sizeof(m_cMutexName));
@@ -38,6 +40,15 @@ BOOL CPMutex::UnLock()
 	return ReleaseMutex(m_pMutex);
 }
 
+static DWORD m_sysError = 0;
+void SetFaultError(DWORD err) {
+	m_sysError = err;
+}
+
+DWORD GetFaultError() {
+	return m_sysError;
+}
+
 CString strCurPath;
 void GetCurPath(CString &strPath)
 {
@@ -48,6 +59,7 @@ void GetCurPath(CString &strPath)
 	strPath = strPath.Left(pos + 1);
 }
 
+BOOL g_dbgLogConsole = FALSE;
 void AppEnvInit()
 {
 	GetCurPath(strCurPath);
@@ -65,9 +77,14 @@ void AppEnvInit()
 
 	str = strCurPath + _T("log");
 	CreateDirectory(str, NULL);
+
+	char* env_dbg = getenv("USBTPV_LOG_CONSOLE");
+
+	if( env_dbg )
+		g_dbgLogConsole = atoi(env_dbg);
+	
+
 }
-
-
 
 int BaseAppInit()
 {
@@ -413,6 +430,10 @@ unsigned long atox(const void * ptr_str, int charwidth)
 	int		i = 0;
 	char	ch;
 	if (str == NULL) return 0;
+	str += strspn(str, " xX");
+	if (str[0] == '0' && (str[1] | 0x20) == 'x') {
+		str += 2;
+	}
 
 	sum = 0;
 
@@ -609,21 +630,29 @@ void  PRT_LOG(const _TCHAR* pszFormat, ...)
 ************************************/
 int ReadReg(LPCTSTR  path, LPCTSTR key, TCHAR* value)
 {
+	CString strpath = L"SOFTWARE\\";
+	strpath += path;
 	HKEY hKey;
-	int ret = RegOpenKeyEx(HKEY_CURRENT_USER, path, 0, KEY_EXECUTE, &hKey);
+	int ret = RegOpenKeyEx(HKEY_CURRENT_USER, strpath, 0, KEY_EXECUTE, &hKey);
 	if (ret != ERROR_SUCCESS)
 	{
 		TRACE( "打开注册表失败" );
 		return 1;
 	}
 
+	char rbuf[64];
 	//读取KEY
 	DWORD dwType = REG_SZ; //数据类型
 	DWORD cbData = 256;
-	ret = RegQueryValueEx(hKey, key, NULL, &dwType, (LPBYTE)value, &cbData);
+	ret = RegQueryValueEx(hKey, key, NULL, &dwType, (LPBYTE)rbuf, &cbData);
 	if (ret == ERROR_SUCCESS)
 	{
-		TRACE( "%S\n" , value);
+		rbuf[cbData] = 0;
+		TRACE( "%s\n" , (char *)rbuf);
+		USES_CONVERSION;
+		TCHAR* vn = A2T(rbuf);
+		_tcscpy_s(value, 64, vn);
+		value[cbData] = 0;
 	}
 	else
 	{
@@ -650,8 +679,10 @@ int WriteReg(LPCTSTR path, LPCTSTR key, TCHAR* value)
 	HKEY hKey;
 	DWORD dwDisp;
 	DWORD dwType = REG_SZ; //数据类型
+	CString strpath = L"SOFTWARE\\";
+	strpath += path;
 
-	int ret = RegCreateKeyEx(HKEY_CURRENT_USER, path, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, &dwDisp);
+	int ret = RegCreateKeyEx(HKEY_CURRENT_USER, strpath, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey, &dwDisp);
 	if (ret != ERROR_SUCCESS)
 	{
 		TRACE("创建注册表失败\n");
@@ -676,7 +707,9 @@ int WriteReg(LPCTSTR path, LPCTSTR key, TCHAR* value)
 ************************************/
 int DelReg(LPCTSTR path)
 {
-	int ret = RegDeleteKey(HKEY_CURRENT_USER, path);
+	CString strpath = L"SOFTWARE\\";
+	strpath += path;
+	int ret = RegDeleteKey(HKEY_CURRENT_USER, strpath);
 	if (ret == ERROR_SUCCESS)
 	{
 		TRACE("删除成功\n");

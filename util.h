@@ -42,6 +42,7 @@ private:
 };
 
 
+extern CString strCurPath;
 void AppEnvInit();
 int BaseAppInit();
 void GetCurPath(CString &strPath);
@@ -95,5 +96,7 @@ int ReadReg(LPCTSTR  path, LPCTSTR key, TCHAR* value);
 int WriteReg(LPCTSTR path, LPCTSTR key, TCHAR* value);
 int DelReg(LPCTSTR path);
 
-
+extern BOOL g_dbgLogConsole;
+DWORD GetFaultError();
+void SetFaultError(DWORD err);
 #endif

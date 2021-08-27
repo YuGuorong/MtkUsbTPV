@@ -101,10 +101,10 @@ void * CDelegate::run(void * param)
 
 // CExDialog ¶Ô»°¿ò
 
-IMPLEMENT_DYNAMIC(CExDialog, CDialogEx)
+IMPLEMENT_DYNAMIC(CExDialog, CDialog)
 
 CExDialog::CExDialog(int IDD, CWnd* pParent /*=NULL*/)
-	: CDialogEx(IDD, pParent)
+	: CDialog(IDD, pParent)
 {
 	//m_pfnDelegate = NULL;
 #ifndef _WIN32_WCE
@@ -119,7 +119,7 @@ CExDialog::~CExDialog()
 
 void CExDialog::DoDataExchange(CDataExchange* pDX)
 {
-	CDialogEx::DoDataExchange(pDX);
+	CDialog::DoDataExchange(pDX);
 }
 
 BOOL CExDialog::PreTranslateMessage(MSG * pMsg)
@@ -139,11 +139,11 @@ BOOL CExDialog::PreTranslateMessage(MSG * pMsg)
 
 	}
 
-	return CDialogEx::PreTranslateMessage(pMsg);
+	return CDialog::PreTranslateMessage(pMsg);
 }
 
 
-BEGIN_MESSAGE_MAP(CExDialog, CDialogEx)
+BEGIN_MESSAGE_MAP(CExDialog, CDialog)
 END_MESSAGE_MAP()
 
 

@@ -29,6 +29,19 @@ CMainFrame::CMainFrame(CWnd* pParent /*=nullptr*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	MAX_PANNEL_NUM = 4;
+	TCHAR val[64];
+	//int reg =  ReadReg(L"USBTPV_SET", L"MAX_PANNEL_MAX", val);
+	//if (reg == 0) {
+	//	MAX_PANNEL_NUM = _ttoi(val);
+	//	if (MAX_PANNEL_NUM < 4) MAX_PANNEL_NUM = 4;
+	//}
+	INT reg = ReadReg(L"USBTPV_SET", L"display_pannels", val);
+	if (reg == 0) {
+		m_dispPannelNum = _ttoi(val);
+		if (m_dispPannelNum < 1 || m_dispPannelNum> MAX_PANNEL_NUM)
+			m_dispPannelNum = 1;
+	}
+
 }
 
 CMainFrame::~CMainFrame()
@@ -40,7 +53,9 @@ void CMainFrame::DoDataExchange(CDataExchange* pDX)
 	CExDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_ST_VERSION, m_strNewVersion);
 	DDX_CBIndex(pDX, IDC_COMBO_ITEMS, m_nPannelMax);
-	
+	DDX_Control(pDX, IDC_LOG_WND, m_oEdit);
+
+	DDX_Control(pDX, IDC_COMBO_ITEMS, m_cbPannelsNum);
 }
 
 
@@ -61,8 +76,8 @@ END_MESSAGE_MAP()
 BOOL CMainFrame::OnInitDialog()
 {
 	CExDialog::OnInitDialog();
-	AppEnvInit();
-	MAX_PANNEL_NUM = 2;
+
+	//MAX_PANNEL_NUM = 2;
 
 	// TODO:  在此添加额外的初始化
 	SetIcon(m_hIcon, TRUE);			// 设置大图标
@@ -85,6 +100,12 @@ BOOL CMainFrame::OnInitDialog()
 		m_oFrames.Add(frame);
 		CPannel* dlg;// = new CSubPanelDlg(this);
 		CREATE_SUB_WND(dlg, CPannel, frame);
+
+		LRESULT err;
+		CFtBoard* pboard = CFtdiDriver::GetDriver()->FindBoard(-1, i, &err);
+		if (pboard) {
+			dlg->SetBoard(pboard);
+		}
 		
 		//dlg->SetIndex(i);
 		m_oPannels.Add(dlg);
@@ -97,8 +118,48 @@ BOOL CMainFrame::OnInitDialog()
 	strTitle.LoadString(IDSTR_VENDOR_APPNAME);
 	this->SetWindowText(strTitle);
 
+
+	// TODO:  在此添加额外的初始化
+	m_of = new CFont;
+	m_of->CreateFont(14,            // nHeight 
+		0,           // nWidth 
+		0,           // nEscapement 
+		0,           // nOrientation 
+		FW_BOLD,     // nWeight 
+		0,           // bItalic 
+		FALSE,       // bUnderline 
+		0,           // cStrikeOut 
+		DEFAULT_CHARSET,              // nCharSet 
+		OUT_DEFAULT_PRECIS,        // nOutPrecision 
+		CLIP_DEFAULT_PRECIS,       // nClipPrecision 
+		DEFAULT_QUALITY,           // nQuality 
+		DEFAULT_PITCH | FF_SWISS, // nPitchAndFamily 
+		_T("宋体"));              // lpszFac
+
+
+	ZeroMemory(&m_cf, sizeof(CHARFORMAT2));
+	m_cf.cbSize = sizeof(CHARFORMAT2);
+	m_cf.dwEffects = 0;
+	m_cf.dwMask |= CFM_BOLD;
+	m_cf.dwEffects |= CFE_BOLD;//设置粗体，取消用cf.dwEffects&=~CFE_BOLD;
+	m_cf.dwMask |= CFM_COLOR;
+	m_cf.crTextColor = RGB(0, 0, 0);//设置颜色
+	m_cf.dwMask |= CFM_SIZE;
+	m_cf.yHeight = 240;//设置高度
+	m_cf.dwMask |= CFM_FACE;
+	_tcscpy_s(m_cf.szFaceName, 32, _T("宋体"));//设置字体
+
+	m_oEdit.SetSel(-1, -1);
+	m_oEdit.SetDefaultCharFormat(m_cf);
+	long longlMask = m_oEdit.GetEventMask();
+	longlMask |= ENM_CHANGE;
+	longlMask &= ~ENM_PROTECTED;
+	m_oEdit.SetEventMask(longlMask);
+
 	// TODO: 在此添加额外的初始化代码
 	ShowWindow(SW_SHOWMAXIMIZED);
+
+	m_cbPannelsNum.SetCurSel(m_dispPannelNum / 2);
 
 	//CArray<SSerInfo, SSerInfo&> asi;
 	//EnumSerialPorts(asi, TRUE);
@@ -143,14 +204,15 @@ void CMainFrame::OnSize(UINT nType, int cx, int cy)
 {
 	CExDialog::OnSize(nType, cx, cy);
 	HWND hwd = this->GetSafeHwnd();
-	int max = (int)m_oFrames.GetSize();
-	if (max && ::IsWindow(hwd)) {
-		int rows = 2;
-		int cols = max / rows;
+	int max = m_dispPannelNum; //(int)m_oFrames.GetSize();
+	if (max && ::IsWindow(hwd) && m_oFrames.GetCount() > 0 ) {
+		int cols = max > 1 ? 2 : 1; 
+		int rows = max / cols;
 		int ox = 4;
 		int oy = 48;
 		cx -= ox * 2;
 		cy -= oy + ox;
+		cols = cols == 0 ? 1 : cols;
 
 		CRect r(0, 0, cx / cols, cy / rows);
 		if (cols) {
@@ -171,7 +233,11 @@ void CMainFrame::OnSize(UINT nType, int cx, int cy)
 					r.MoveToX(r.Width());
 			}
 		}
+		//CRect r(0, 0, cx, cy);
+		//r.top = r.bottom - 100;
+		//m_oEdit.MoveWindow(r);
 	}
+
 }
 
 
@@ -223,7 +289,7 @@ void CMainFrame::OnClose()
 void CMainFrame::OnDestroy()
 {
 	CExDialog::OnDestroy();
-
+	delete m_of;
 	// TODO: 在此处添加消息处理程序代码
 }
 
@@ -299,4 +365,33 @@ LRESULT CMainFrame::OnMyDeviceChange(WPARAM wParam, LPARAM lParam)
 void CMainFrame::OnCbnSelchangeComboItems()
 {
 	// TODO: 在此添加控件通知处理程序代码
+	UpdateData();
+	int index = m_cbPannelsNum.GetCurSel();
+	CString str;
+	m_cbPannelsNum.GetLBText(index, str);
+	int numSel = _ttoi(str);
+	if (m_dispPannelNum == numSel) return;
+	m_dispPannelNum = numSel;
+	for (int i = 0; i < MAX_PANNEL_NUM; i++) {
+		if (i < m_dispPannelNum) {
+			m_oFrames[i]->ShowWindow(SW_SHOW);
+		}
+		else {
+			m_oFrames[i]->ShowWindow(SW_HIDE);
+		}
+	}
+	CRect  r;
+	this->GetWindowRect(&r);
+	this->OnSize(0, r.Width(), r.Height());
+	//this->movetocl
+	//this->MoveWindow()
+	this->Invalidate();
+	TCHAR val[16];
+	_tcscpy_s(val, str);
+	WriteReg(L"USBTPV_SET", L"display_pannels", val);
+	//_tcprintf_s(val, L"%d", MAX_PANNEL_NUM);
+	//WriteReg(L"USBTPV_SET", L"MAX_PANNEL_MAX", val);
+
+	//this->UpdateWindow();
+
 }

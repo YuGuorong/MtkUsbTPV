@@ -1,0 +1,16 @@
+{
+	"Devices" : 
+	[
+		{
+			"BoardID" : 8481,
+			"DeviceNum" : 2,
+			"Index" : 0
+		},
+		{
+			"BoardID" : 8497,
+			"DeviceNum" : 2,
+			"Index" : 1
+		}
+	],
+	"IndexMax" : 2
+}

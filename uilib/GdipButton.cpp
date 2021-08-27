@@ -41,6 +41,8 @@ using namespace Gdiplus;
 static char THIS_FILE[] = __FILE__;
 #endif
 
+#define  TRANSPARENT_BK_IMG  0
+
 
 class CGarbgeCollection
 {
@@ -81,6 +83,7 @@ CGdipButton::CGdipButton()
 	m_nCurType = STD_TYPE;
 
 	m_pToolTip = NULL;
+	m_cx=-1, m_cy = -1;
 
 	LOGFONT lf;
 	memset(&lf, 0, sizeof(LOGFONT));
@@ -93,6 +96,8 @@ CGdipButton::CGdipButton()
 
 CGdipButton::~CGdipButton()
 {
+	ResetAllDC();
+
 	if(m_pStdImage) delete m_pStdImage;
 	if(m_pAltImage) delete m_pAltImage;
 
@@ -110,6 +115,7 @@ BEGIN_MESSAGE_MAP(CGdipButton, CButton)
 	ON_MESSAGE(WM_MOUSELEAVE, OnMouseLeave)
 	ON_MESSAGE(WM_MOUSEHOVER, OnMouseHover)
 	//}}AFX_MSG_MAP
+	ON_WM_SIZE()
 END_MESSAGE_MAP()
 
 
@@ -166,6 +172,18 @@ BOOL CGdipButton::LoadAltImage(UINT id, LPCTSTR pType)
 	return (m_pAltImage->Load(id, pType));
 }
 
+void  CGdipButton::ResetAllDC()
+{
+	CDC* dclist[] = { &m_dcBk , &m_dcStd , &m_dcStdP, &m_dcStdH , &m_dcAlt,&m_dcAltP,&m_dcAltH,&m_dcGS };
+	for (int i = 0; i < sizeof(dclist) / sizeof(CDC*); i++) {
+		if (dclist[i]->m_hDC) {
+			DeleteDC(dclist[i]->m_hDC);
+			dclist[i]->DeleteDC();
+			dclist[i]->m_hDC = NULL;
+		}
+	}
+	m_bHaveBitmaps = false;
+}
 
 //=============================================================================
 //
@@ -209,7 +227,13 @@ HBRUSH CGdipButton::CtlColor(CDC* pScreenDC, UINT nCtlColor)
 			m_dcBk.CreateCompatibleDC(&clDC);
 			bmp.CreateCompatibleBitmap(&clDC, rect.Width(), rect.Height());
 			pOldBitmap = m_dcBk.SelectObject(&bmp);
+#if TRANSPARENT_BK_IMG
 			m_dcBk.BitBlt(0, 0, rect.Width(), rect.Height(), &clDC, rect1.left, rect1.top, SRCCOPY);
+#else
+			CBrush * pbrush = new CBrush(0xF0F0F0);
+			m_dcBk.FillRect(rect, pbrush);
+			delete pbrush;
+#endif
 			bmp.DeleteObject();
 		}
 
@@ -515,7 +539,7 @@ LRESULT CGdipButton::OnMouseHover(WPARAM wparam, LPARAM lparam)
 	DeleteToolTip();
 
 	// Create a new Tooltip with new Button Size and Location
-	SetToolTipText(m_tooltext);
+	//SetToolTipText(m_tooltext);
 
 	if (m_pToolTip != NULL)
 	{
@@ -650,3 +674,27 @@ void CGdipButton::DeleteToolTip()
 	}
 }
 
+
+
+BOOL CGdipButton::DestroyWindow()
+{
+	// TODO: 在此添加专用代码和/或调用基类
+
+
+
+	return CButton::DestroyWindow();
+}
+
+
+void CGdipButton::OnSize(UINT nType, int cx, int cy)
+{
+	CButton::OnSize(nType, cx, cy);
+	if (cx != m_cx || cy != m_cy) {
+		ResetAllDC();
+		m_cx = cx;
+		m_cy = cy;
+		this->UpdateWindow();
+	}
+
+	// TODO: 在此处添加消息处理程序代码
+}

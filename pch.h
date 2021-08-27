@@ -6,8 +6,10 @@
 
 #ifndef PCH_H
 #define PCH_H
-
+#undef _AFX_NO_MFC_CONTROLS_IN_DIALOGS
 // 添加要在此处预编译的标头
 #include "framework.h"
+#undef _AFX_NO_MFC_CONTROLS_IN_DIALOGS
 #include <afxcontrolbars.h> 
+#undef _AFX_NO_MFC_CONTROLS_IN_DIALOGS
 #endif //PCH_H

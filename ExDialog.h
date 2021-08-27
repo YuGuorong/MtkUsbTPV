@@ -42,7 +42,7 @@ public:
 
 
 
-class CExDialog : public CDialogEx
+class CExDialog : public CDialog
 {
 	DECLARE_DYNAMIC(CExDialog)
 

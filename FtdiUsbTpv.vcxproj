@@ -31,7 +31,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Dynamic</UseOfMfc>
+    <UseOfMfc>Static</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -39,7 +39,7 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Dynamic</UseOfMfc>
+    <UseOfMfc>Static</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -93,6 +93,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -106,9 +107,9 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -154,6 +155,8 @@
     <ClInclude Include="CFtDevice.h" />
     <ClInclude Include="CMainFrame.h" />
     <ClInclude Include="CPannel.h" />
+    <ClInclude Include="CSimpleLog.h" />
+    <ClInclude Include="CUsbTPVApp.h" />
     <ClInclude Include="EnumSerial.h" />
     <ClInclude Include="ExDialog.h" />
     <ClInclude Include="framework.h" />
@@ -161,6 +164,16 @@
     <ClInclude Include="FtdiUsbTpv.h" />
     <ClInclude Include="getopt.h" />
     <ClInclude Include="InvokeExternalExe.h" />
+    <ClInclude Include="libjson\json\allocator.h" />
+    <ClInclude Include="libjson\json\assertions.h" />
+    <ClInclude Include="libjson\json\config.h" />
+    <ClInclude Include="libjson\json\forwards.h" />
+    <ClInclude Include="libjson\json\json.h" />
+    <ClInclude Include="libjson\json\json_features.h" />
+    <ClInclude Include="libjson\json\reader.h" />
+    <ClInclude Include="libjson\json\value.h" />
+    <ClInclude Include="libjson\json\version.h" />
+    <ClInclude Include="libjson\json\writer.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SubPanelDlg.h" />
@@ -178,6 +191,8 @@
     <ClCompile Include="CFtdiDriver.cpp" />
     <ClCompile Include="CMainFrame.cpp" />
     <ClCompile Include="CPannel.cpp" />
+    <ClCompile Include="CSimpleLog.cpp" />
+    <ClCompile Include="CUsbTPVApp.cpp" />
     <ClCompile Include="EnumSerial.cpp" />
     <ClCompile Include="ExDialog.cpp" />
     <ClCompile Include="FtdiUsbTpv.cpp" />
@@ -199,6 +214,7 @@
   </ItemGroup>
   <ItemGroup>
     <Library Include="ftd2xx.lib" />
+    <Library Include="libjson\jsoncpp_static.lib" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\MtkUsbTPV.ico" />

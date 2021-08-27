@@ -16,6 +16,9 @@
     <Filter Include="uilib">
       <UniqueIdentifier>{19fc787f-295f-4bfd-8299-3c12a4def749}</UniqueIdentifier>
     </Filter>
+    <Filter Include="libjson">
+      <UniqueIdentifier>{1dc0cc6f-3262-4021-875f-c482ea945191}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -84,6 +87,42 @@
     <ClInclude Include="SubPanelDlg.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="libjson\json\allocator.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\assertions.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\config.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\forwards.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\json.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\json_features.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\reader.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\value.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\version.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="libjson\json\writer.h">
+      <Filter>libjson</Filter>
+    </ClInclude>
+    <ClInclude Include="CSimpleLog.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="CUsbTPVApp.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FtdiUsbTpv.cpp">
@@ -128,6 +167,12 @@
     <ClCompile Include="CFtdiDriver.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="CSimpleLog.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="CUsbTPVApp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="FtdiUsbTpv.rc">
@@ -137,6 +182,9 @@
   <ItemGroup>
     <Library Include="ftd2xx.lib">
       <Filter>源文件</Filter>
+    </Library>
+    <Library Include="libjson\jsoncpp_static.lib">
+      <Filter>libjson</Filter>
     </Library>
   </ItemGroup>
   <ItemGroup>

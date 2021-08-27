@@ -29,12 +29,16 @@ public:
 	map<CString, void*>m_mapDev;
 	int   m_scanUsbTimes;
 	int   MAX_PANNEL_NUM;
+	int   m_dispPannelNum;
 	int   m_pannles_state;
 	BOOL m_bDefaultALl;
 	CStatic m_strNewVersion;
 	CString m_sPannelMax;
 	INT   m_nPannelMax;
 	HICON m_hIcon;
+	CRichEditCtrl m_oEdit;
+	CHARFORMAT2 m_cf;
+	CFont* m_of;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
@@ -53,4 +57,5 @@ public:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	BOOL CheckSubPannelRunning(BOOL bmessagebox = FALSE );
 	afx_msg void OnCbnSelchangeComboItems();
+	CComboBox m_cbPannelsNum;
 };
