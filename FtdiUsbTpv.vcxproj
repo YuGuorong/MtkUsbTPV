@@ -36,7 +36,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141_xp</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <UseOfMfc>Static</UseOfMfc>
@@ -164,16 +164,6 @@
     <ClInclude Include="FtdiUsbTpv.h" />
     <ClInclude Include="getopt.h" />
     <ClInclude Include="InvokeExternalExe.h" />
-    <ClInclude Include="libjson\json\allocator.h" />
-    <ClInclude Include="libjson\json\assertions.h" />
-    <ClInclude Include="libjson\json\config.h" />
-    <ClInclude Include="libjson\json\forwards.h" />
-    <ClInclude Include="libjson\json\json.h" />
-    <ClInclude Include="libjson\json\json_features.h" />
-    <ClInclude Include="libjson\json\reader.h" />
-    <ClInclude Include="libjson\json\value.h" />
-    <ClInclude Include="libjson\json\version.h" />
-    <ClInclude Include="libjson\json\writer.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SubPanelDlg.h" />
@@ -214,7 +204,6 @@
   </ItemGroup>
   <ItemGroup>
     <Library Include="ftd2xx.lib" />
-    <Library Include="libjson\jsoncpp_static.lib" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\MtkUsbTPV.ico" />

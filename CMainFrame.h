@@ -36,9 +36,7 @@ public:
 	CString m_sPannelMax;
 	INT   m_nPannelMax;
 	HICON m_hIcon;
-	CRichEditCtrl m_oEdit;
-	CHARFORMAT2 m_cf;
-	CFont* m_of;
+
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持

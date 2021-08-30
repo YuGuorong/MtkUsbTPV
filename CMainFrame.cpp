@@ -38,10 +38,11 @@ CMainFrame::CMainFrame(CWnd* pParent /*=nullptr*/)
 	INT reg = ReadReg(L"USBTPV_SET", L"display_pannels", val);
 	if (reg == 0) {
 		m_dispPannelNum = _ttoi(val);
-		if (m_dispPannelNum < 1 || m_dispPannelNum> MAX_PANNEL_NUM)
-			m_dispPannelNum = 1;
 	}
-
+	if (m_dispPannelNum <= 1 || m_dispPannelNum> MAX_PANNEL_NUM)
+		m_dispPannelNum = 1;
+	else if (m_dispPannelNum % 2 == 1)
+		m_dispPannelNum = (m_dispPannelNum/2)*2;
 }
 
 CMainFrame::~CMainFrame()
@@ -53,7 +54,6 @@ void CMainFrame::DoDataExchange(CDataExchange* pDX)
 	CExDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_ST_VERSION, m_strNewVersion);
 	DDX_CBIndex(pDX, IDC_COMBO_ITEMS, m_nPannelMax);
-	DDX_Control(pDX, IDC_LOG_WND, m_oEdit);
 
 	DDX_Control(pDX, IDC_COMBO_ITEMS, m_cbPannelsNum);
 }
@@ -118,43 +118,6 @@ BOOL CMainFrame::OnInitDialog()
 	strTitle.LoadString(IDSTR_VENDOR_APPNAME);
 	this->SetWindowText(strTitle);
 
-
-	// TODO:  在此添加额外的初始化
-	m_of = new CFont;
-	m_of->CreateFont(14,            // nHeight 
-		0,           // nWidth 
-		0,           // nEscapement 
-		0,           // nOrientation 
-		FW_BOLD,     // nWeight 
-		0,           // bItalic 
-		FALSE,       // bUnderline 
-		0,           // cStrikeOut 
-		DEFAULT_CHARSET,              // nCharSet 
-		OUT_DEFAULT_PRECIS,        // nOutPrecision 
-		CLIP_DEFAULT_PRECIS,       // nClipPrecision 
-		DEFAULT_QUALITY,           // nQuality 
-		DEFAULT_PITCH | FF_SWISS, // nPitchAndFamily 
-		_T("宋体"));              // lpszFac
-
-
-	ZeroMemory(&m_cf, sizeof(CHARFORMAT2));
-	m_cf.cbSize = sizeof(CHARFORMAT2);
-	m_cf.dwEffects = 0;
-	m_cf.dwMask |= CFM_BOLD;
-	m_cf.dwEffects |= CFE_BOLD;//设置粗体，取消用cf.dwEffects&=~CFE_BOLD;
-	m_cf.dwMask |= CFM_COLOR;
-	m_cf.crTextColor = RGB(0, 0, 0);//设置颜色
-	m_cf.dwMask |= CFM_SIZE;
-	m_cf.yHeight = 240;//设置高度
-	m_cf.dwMask |= CFM_FACE;
-	_tcscpy_s(m_cf.szFaceName, 32, _T("宋体"));//设置字体
-
-	m_oEdit.SetSel(-1, -1);
-	m_oEdit.SetDefaultCharFormat(m_cf);
-	long longlMask = m_oEdit.GetEventMask();
-	longlMask |= ENM_CHANGE;
-	longlMask &= ~ENM_PROTECTED;
-	m_oEdit.SetEventMask(longlMask);
 
 	// TODO: 在此添加额外的初始化代码
 	ShowWindow(SW_SHOWMAXIMIZED);
@@ -289,7 +252,6 @@ void CMainFrame::OnClose()
 void CMainFrame::OnDestroy()
 {
 	CExDialog::OnDestroy();
-	delete m_of;
 	// TODO: 在此处添加消息处理程序代码
 }
 
@@ -319,8 +281,7 @@ void CMainFrame::OnTimer(UINT_PTR nIDEvent)
 	{
 		KillTimer(nIDEvent);
 		{
-			if (m_scanUsbTimes++ < 10)
-				SetTimer(TMR_ID_SCAN_USB, (2 + m_scanUsbTimes * 2) * 1000, NULL);
+			CFtdiDriver::GetDriver()->Scan(TRUE);
 		}
 		return;
 	}
@@ -358,7 +319,7 @@ void CMainFrame::OnTimer(UINT_PTR nIDEvent)
 
 LRESULT CMainFrame::OnMyDeviceChange(WPARAM wParam, LPARAM lParam)
 {
-	SetTimer(TMR_ID_SCAN_USB, 200, NULL);
+	SetTimer(TMR_ID_SCAN_USB, 1000, NULL);
 	return 1;
 }
 

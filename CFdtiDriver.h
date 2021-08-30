@@ -5,7 +5,7 @@
 #include "CSimpleLog.h"
 
 using namespace std;
-typedef  int  fdtiid;
+typedef  DWORD  fdtiid;
 
 typedef int (*fLog)(const char* fmt, ...);
 

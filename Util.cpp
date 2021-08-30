@@ -67,9 +67,9 @@ void AppEnvInit()
 	str += _T("bin");
 	CString ssvr;
 
-	TCHAR buf[2049];
+	TCHAR* buf = new TCHAR[16 * 1024+8];
 	CString spath = ssvr + strCurPath + _T("bin");
-	int rl = GetEnvironmentVariable(_T("PATH"), buf, 2048);
+	int rl = GetEnvironmentVariable(_T("PATH"), buf, 16*1024);
 	buf[rl] = 0;
 	spath += _T(";");
 	spath += buf;
@@ -82,7 +82,7 @@ void AppEnvInit()
 
 	if( env_dbg )
 		g_dbgLogConsole = atoi(env_dbg);
-	
+	delete[] buf;
 
 }
 
@@ -596,7 +596,8 @@ BOOL  regist_device_htplug(void)
 	NotificationFilter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
 	for (int i = 0; i < GUID_DEVINTERFACE_LIST_LEN; i++) {
 		NotificationFilter.dbcc_classguid = GUID_DEVINTERFACE_LIST[i];
-		hDevNotify = RegisterDeviceNotification(::AfxGetMainWnd()->GetSafeHwnd(), &NotificationFilter, DEVICE_NOTIFY_WINDOW_HANDLE);
+		CWnd* pwnd = ::AfxGetMainWnd();
+		hDevNotify = RegisterDeviceNotification(pwnd->GetSafeHwnd(), &NotificationFilter, DEVICE_NOTIFY_WINDOW_HANDLE);
 		if (!hDevNotify) {
 			AfxMessageBox(CString("Can't register device notification: ")
 				+ _com_error(GetLastError()).ErrorMessage(), MB_ICONEXCLAMATION);

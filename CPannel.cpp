@@ -159,10 +159,14 @@ void CPannel::OnSize(UINT nType, int cx, int cy)
 	ctrl->GetWindowRect(r_keyl);
 	this->ScreenToClient(&r_keyl);
 
-	//int w = moveConBtns(r_sw.left, cx);
+	//wc :width of cons
+	//hc :high of cons
+	//sw :switch buttons
+	//key:header ctrl key buttons(left butons)
 	int wcons = cx - r_sw.left - 10;
 	int wcon = wcons / 8;
-	int wc_con = wcon - 20;
+	int wc_con = wcon - wcon/8 - 4;
+	TRACE("====> wcon %d\n", wcon);
 	for (int i = 0; i < 8; i++)
 	{
 		ctrl = GetDlgItem(IDC_BTN_CON0 + i);
@@ -183,6 +187,7 @@ void CPannel::OnSize(UINT nType, int cx, int cy)
 	else
 		wc_sw = hc_sw * 2;
 
+	//resize left ctrl buttons
 	int kyeids[] = { IDC_BTN_PWRKEY, IDC_BTN_KCOL0, IDC_BTN_HOME, IDC_BTN_GPIO };
 	for (int i = 0; i < 4; i++) {
 		ctrl = GetDlgItem(kyeids[ i]);
@@ -195,6 +200,9 @@ void CPannel::OnSize(UINT nType, int cx, int cy)
 	r.MoveToY(r_sw.top + hkey * 3 + marg_gpio);
 	ctrl->MoveWindow(r);
 
+
+	//resize switch-buttons
+	int dert = 0;// hc_sw / 5;
 	for (int j = 0; j < 8; j++) {
 		for (int i = 0; i < 3; i++) {
 			ctrl = GetDlgItem(IDC_BTN_POWER_1 + j*3 +i );
@@ -202,11 +210,12 @@ void CPannel::OnSize(UINT nType, int cx, int cy)
 			this->ScreenToClient(r);
 			
 			r.right = r.left + wc_sw;
-			r.bottom = r.top + hc_sw;
-			r.MoveToXY(r_sw.left + wcon * j, r_sw.top + hkey * i);
+			r.bottom = r.top + hc_sw -dert;
+			r.MoveToXY(r_sw.left + wcon * j, r_sw.top + hkey * i+dert/2);
 			ctrl->MoveWindow(r);
 		}
 
+		//resize boarders
 		if (j < 7) {
 			ctrl = GetDlgItem(IDC_STATIC1 + j);
 			ctrl->GetWindowRect(r);
@@ -218,6 +227,7 @@ void CPannel::OnSize(UINT nType, int cx, int cy)
 		
 	}
 	
+	//resize gpio header buttons
 	int h = rtgpio.Height();
 	for (int i = 0; i < 8; i++) {
 		ctrl = GetDlgItem(IDC_BTN_GPIO_1 + i);
@@ -235,7 +245,7 @@ void CPannel::OnSize(UINT nType, int cx, int cy)
 		ctrl->MoveWindow(r);
 	}
 	
-	
+	//resize gpio_ctrl button
 	ctrl = GetDlgItem(IDC_STATIC_GPIO);
 	ctrl->GetWindowRect(r);
 	this->ScreenToClient(r);
@@ -243,6 +253,7 @@ void CPannel::OnSize(UINT nType, int cx, int cy)
 	r.MoveToY(r_sw.top + hkey * 3 + marg_gpio - 10);
 	ctrl->MoveWindow(r);
 	
+	//resize left boarder
 	ctrl = GetDlgItem(IDC_STATIC0);
 	ctrl->GetWindowRect(r);
 	this->ScreenToClient(r);

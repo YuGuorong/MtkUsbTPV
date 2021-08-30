@@ -158,7 +158,7 @@ unsigned CInvokeExternalExe::AsyncInvoke()
     DWORD dwExitCode = 0;  
     tstring strErrorMsg;  
   
-    PTCHAR lpCommandLine = NULL;  
+    TCHAR *lpCommandLine = NULL;  
     if (!m_bCommandLineIsNull)  
     {  
         lpCommandLine = new TCHAR[m_strCommandLine.length() + 1];  

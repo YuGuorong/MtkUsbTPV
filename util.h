@@ -82,6 +82,7 @@ HANDLE RunProc(LPCTSTR strcmd, LPCTSTR strparam, LPCTSTR strPath, BOOL bsync, BO
 #include <Dbt.h>
 #include "EnumSerial.h"
 
+
 #define   GUID_CLASS_USB_DEVICE     GUID_DEVINTERFACE_USB_DEVICE  
 extern HDEVNOTIFY hDevNotify ;
 

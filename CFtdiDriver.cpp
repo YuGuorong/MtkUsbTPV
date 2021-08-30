@@ -63,7 +63,7 @@ LRESULT CFtdiDriver::SetAll(int index, BYTE val)
 	
 	return LRESULT(0);
 }
-#include "libjson/json/json.h"
+//#include "libjson/json/json.h"
 void CFtdiDriver::Load()
 {
 	//ifstream ifs("", ios::in);
@@ -178,7 +178,7 @@ LRESULT CFtdiDriver::MountDevices()
 		if (m_pDevInfoList[i].LocId - lastLocId == 0) {
 			CString sinfo;
 			int n = i == 0 ? 0 : i - 1;
-			sinfo.Format(L"设备ID重名！\r\n设备序号：%d, 设备ID:%d \r\n设备序号：%d, 设备ID:%d ",
+			sinfo.Format(L"无法获取到正确的设备ID（重名）！\r\n设备序号：%d, 设备ID:%d \r\n设备序号：%d, 设备ID:%d \r\n 请退出程序后重新插拔USB 再开启程序试试！",
 				i, devID, n, m_pDevInfoList[n].LocId);
 			::MessageBox(NULL, sinfo, L"系统错误", MB_OK);
 			return ERROR_INVALID_ADDRESS;

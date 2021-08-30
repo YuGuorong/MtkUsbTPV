@@ -89,7 +89,7 @@ LRESULT CFtDevice::ReadChn( int idx)
 	 }
 	 m_lowByte = byInputBuffer[0];
 	 m_highByte = byInputBuffer[1];
-	 logInfo(L" R: Dev[%d/%d] 0x%X , 0x%X\n",  m_OpenIndex, m_FtdiID, m_lowByte, m_highByte);
+	 logInfo(L" R: Dev[%d/%x] 0x%X , 0x%X\n",  m_OpenIndex, m_FtdiID, m_lowByte, m_highByte);
 
 	 return S_OK;
 }
@@ -445,7 +445,7 @@ void CFtBoard::DoMount(BOOL bMount)
 					return;
 				}
 				strInfo.Format(L"%d", it->second->m_ComPort);
-				m_strPortInfo =  (m_strPortInfo.IsEmpty() ? strInfo : m_strPortInfo + "/" + strInfo);
+				m_strPortInfo =  (m_strPortInfo.IsEmpty() ? strInfo : m_strPortInfo + L"/" + strInfo);
 
 			}
 			else

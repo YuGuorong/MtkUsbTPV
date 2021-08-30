@@ -288,8 +288,37 @@ int server_entry(int argc, char** argv)
 }
 
 
+
+#include<DbgHelp.h>
+using namespace std;
+#pragma comment(lib,"DbgHelp.lib")
+
+// 创建Dump文件
+void CreateDumpFile(LPCWSTR lpstrDumpFilePathName, EXCEPTION_POINTERS* pException)
+{
+    HANDLE hDumpFile = CreateFile(lpstrDumpFilePathName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    // Dump信息
+    MINIDUMP_EXCEPTION_INFORMATION dumpInfo;
+    dumpInfo.ExceptionPointers = pException;
+    dumpInfo.ThreadId = GetCurrentThreadId();
+    dumpInfo.ClientPointers = TRUE;
+    // 写入Dump文件内容
+    MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hDumpFile, MiniDumpNormal, &dumpInfo, NULL, NULL);
+    CloseHandle(hDumpFile);
+}
+
+// 处理Unhandled Exception的回调函数
+LONG ApplicationCrashHandler(EXCEPTION_POINTERS* pException)
+{
+    CreateDumpFile(L"crash.dmp", pException);
+    printf("异常已记录到文件：crash.dmp");
+    system("pause");
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
 int main(int argc, char* argv[])
 {
+    SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)ApplicationCrashHandler);
 
     HMODULE hModule = ::GetModuleHandle(nullptr);
 
@@ -306,7 +335,7 @@ int main(int argc, char* argv[])
         wprintf(L"错误: MFC 初始化失败\n");
         return 1;
     }
-    ::AfxInitRichEdit2();
+    //::AfxInitRichEdit2();
 
     return server_entry(argc, argv);
     argc = sizeof(testarg)/ sizeof(char*);
