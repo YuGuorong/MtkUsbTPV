@@ -288,7 +288,6 @@ int server_entry(int argc, char** argv)
 }
 
 
-
 #include<DbgHelp.h>
 using namespace std;
 #pragma comment(lib,"DbgHelp.lib")
@@ -315,6 +314,7 @@ LONG ApplicationCrashHandler(EXCEPTION_POINTERS* pException)
     system("pause");
     return EXCEPTION_EXECUTE_HANDLER;
 }
+
 
 int main(int argc, char* argv[])
 {

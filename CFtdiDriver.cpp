@@ -166,37 +166,14 @@ LRESULT CFtdiDriver::MountDevices()
 
 	INT lastLocId = UNINIT_LCLID;
 	int subChannels = 0;
-	map<fdtiid, int>idlist;
-	for (int i = 0; i < m_DevChannels; i++) {
-		idlist[m_pDevInfoList[i].LocId] = i;
-	}
-	qsort(m_pDevInfoList, m_DevChannels, sizeof(FT_DEVICE_LIST_INFO_NODE), comp_dev);
+
 	CFtBoard * board = NULL;
 	for (int i = 0; i < (int)m_DevChannels; i++) {
-
-		fdtiid devID = (fdtiid)m_pDevInfoList[i].LocId;
-		if (m_pDevInfoList[i].LocId - lastLocId == 0) {
-			CString sinfo;
-			int n = i == 0 ? 0 : i - 1;
-			sinfo.Format(L"无法获取到正确的设备ID（重名）！\r\n设备序号：%d, 设备ID:%d \r\n设备序号：%d, 设备ID:%d \r\n 请退出程序后重新插拔USB 再开启程序试试！",
-				i, devID, n, m_pDevInfoList[n].LocId);
-			::MessageBox(NULL, sinfo, L"系统错误", MB_OK);
-			return ERROR_INVALID_ADDRESS;
-		}
-
-		if (devID - lastLocId == 1) {
-			if (subChannels) {
-				if (board) board->AddDevice(&m_pDevInfoList[i], idlist[devID]);
-				--subChannels;
-			}
-			lastLocId = (subChannels == 0) ? UNINIT_LCLID : devID;
-		}
-		else { //new board
+		if ( lastLocId == UNINIT_LCLID) { //new board
 			switch (m_pDevInfoList[i].Type) {
 			case FT_DEVICE_2232H:
 			case FT_DEVICE_2232C:
-				subChannels = 1;
-				break;
+				subChannels = 1;				break;
 			case FT_DEVICE_4232H:
 				subChannels = 3;
 				break;
@@ -205,17 +182,23 @@ LRESULT CFtdiDriver::MountDevices()
 				break;
 			}
 			if (subChannels) { //valid board
-				board = FindBoard(devID, -1);
-				if ( board == NULL ) {
+				board = FindBoard(-1, i);
+				if (board == NULL) {
 					board = new CFtBoard(m_BoardIdxNum);
 					m_BoardList[m_BoardIdxNum] = board;
-					m_BoardIdxNum++;	
-					board->AddDevice(&m_pDevInfoList[i], idlist[devID]);
+					m_BoardIdxNum++;
+					board->AddDevice(&m_pDevInfoList[i], i);
 				}
 				board->m_bcheckMount = TRUE;
-				
+
 			}
-			lastLocId = devID;
+			lastLocId = i;
+		} else {
+			if (subChannels) {
+				if (board) board->AddDevice(&m_pDevInfoList[i], i);
+				--subChannels;
+			}
+			lastLocId = (subChannels == 0) ? UNINIT_LCLID : i;
 		}
 	}
 

@@ -90,6 +90,9 @@
     <ClInclude Include="CUsbTPVApp.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="CPca9505.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FtdiUsbTpv.cpp">
@@ -138,6 +141,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="CUsbTPVApp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="CPca9505.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

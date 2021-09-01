@@ -43,6 +43,13 @@ CMainFrame::CMainFrame(CWnd* pParent /*=nullptr*/)
 		m_dispPannelNum = 1;
 	else if (m_dispPannelNum % 2 == 1)
 		m_dispPannelNum = (m_dispPannelNum/2)*2;
+	if (reg != 0) {
+		CString str;
+		str.Format(L"%d", m_dispPannelNum);
+		TCHAR val[16];
+		_tcscpy_s(val, str);
+		WriteReg(L"USBTPV_SET", L"display_pannels", val);
+	}
 }
 
 CMainFrame::~CMainFrame()

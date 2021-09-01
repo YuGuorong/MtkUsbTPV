@@ -116,7 +116,11 @@ LRESULT CFtDevice::Write(int idx) {
 	}
 
 	FT_STATUS ftStatus = FT_Write(m_ftHandle, OutputBuffer, dwNumBytesToSend, &dwNumBytesSent);		//Send off the commands
-	logInfo(L" W: Dev[%d/%d]: 0x%X , 0x%X\n", m_OpenIndex, m_FtdiID, m_lowByte, m_highByte);
+	logInfo(L" W(%d): Dev[%d/%d]: 0x%X , 0x%X\n", ftStatus, m_OpenIndex, m_FtdiID, m_lowByte, m_highByte);
+	if (ftStatus != FT_OK) {
+		SetFaultError(ftStatus);
+		return ftStatus;
+	}
 	return S_OK;
 }
 
@@ -149,7 +153,7 @@ LRESULT CFtDevice::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync )
 	if (m_ftHandle == INVALID_HANDLE_VALUE) Open();
 	if (m_ftHandle == INVALID_HANDLE_VALUE) return ERROR_DEVICE_NOT_AVAILABLE;
 	int gpiobase = con * 3+4;
-	
+	FT_STATUS ftStatus = FT_OK;
 	
 	if (op->ret != S_OK) return op->ret;
 	IO_VAL_RAW* rawval = (IO_VAL_RAW*)&op->val;
@@ -160,7 +164,7 @@ LRESULT CFtDevice::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync )
 			m_lowByte &= ~0xF0;
 			m_lowByte |= rawv & 0xF0;
 			m_highByte = (rawv >> 8) & 0xFF;
-			if( bhwSync) Write(3);
+			if( bhwSync) ftStatus = Write(3);
 		}
 		else {
 			char* pin = op->val.pin;
@@ -175,7 +179,7 @@ LRESULT CFtDevice::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync )
 					}
 				}
 			}
-			if (bhwSync) Write(3);
+			if (bhwSync) ftStatus = Write(3);
 		}
 	}
 	else {
@@ -194,7 +198,7 @@ LRESULT CFtDevice::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync )
 			}
 		}
 	}
-	return S_OK;
+	return ftStatus== FT_OK ? S_OK : ftStatus;
 }
 
 
@@ -411,22 +415,17 @@ CFtBoard::CFtBoard(int idx) {
 
 CFtBoard::~CFtBoard()
 {
-	for (map<fdtiid, CFtDevice*>::iterator it = m_Devices.begin(); it != m_Devices.end(); ) {
-		if( it->second )
-			delete it->second;
-		m_Devices.erase(it);
+	for (int i = 0; i < m_deviceNum; i++) {
+		delete m_Devices[i];
 	}
+	m_deviceNum = 0;
 }
 
 void CFtBoard::AddDevice(FT_DEVICE_LIST_INFO_NODE* pdevInfo, int open_idx)
 {
-	fdtiid devid = pdevInfo->LocId;
-	map< fdtiid, CFtDevice*>::iterator iter = m_Devices.find(devid);
-	if (iter == m_Devices.end()) {
-		m_Devices[devid] = new CFtDevice(pdevInfo, open_idx);
-	}	
-	if (m_BoardID > devid ) {
-		m_BoardID = devid;
+	m_Devices[m_deviceNum] = new CFtDevice(pdevInfo, open_idx);
+	if ( m_deviceNum == 0  ) {
+		m_BoardID = (DWORD)m_Devices[m_deviceNum];
 	}
 	m_deviceNum++;
 }
@@ -437,20 +436,19 @@ void CFtBoard::DoMount(BOOL bMount)
 	{
 		m_strPortInfo.Empty();
 		CString strInfo;
-		for (map<fdtiid, CFtDevice*>::iterator it = m_Devices.begin(); it != m_Devices.end(); it++ ) {
+		for(int i=0; i<m_deviceNum; i++){
 			if (bMount) {
-				LRESULT ret = it->second->Open();
+				LRESULT ret = m_Devices[i]->Open();
 				if (ret != S_OK) {
 					SetFaultError(ret);
 					return;
 				}
-				strInfo.Format(L"%d", it->second->m_ComPort);
+				strInfo.Format(L"%d", m_Devices[i]->m_ComPort);
 				m_strPortInfo =  (m_strPortInfo.IsEmpty() ? strInfo : m_strPortInfo + L"/" + strInfo);
-
 			}
 			else
 			{
-				it->second->Close();
+				m_Devices[i]->Close();
 			}
 		}
 		m_bMounted = bMount;
@@ -461,30 +459,38 @@ LRESULT CFtBoard::SyncIO(vector<IO_OP>& io_reqQue)
 {
 	LRESULT ret = S_OK;
 	for (int i = 0; i < (int)io_reqQue.size(); i++) {
+		LRESULT err = S_OK;
 		int con = io_reqQue[i].val.con;
 		if (con == IO_CON_GPIO) {
-			int id = m_BoardID ;
+			int id = 0 ;
 			IO_GPIO*op = (IO_GPIO * )&io_reqQue[i].val;
 			if ( op->israw ) {
-				m_Devices[id]->SetGPIO(op->val & 0xF);
-				m_Devices[id+1]->SetGPIO( (op->val>>4) & 0xF);
+				err = m_Devices[id]->SetGPIO(op->val & 0xF);
+				if( err == FT_OK ) m_Devices[id+1]->SetGPIO( (op->val>>4) & 0xF);
 			}
 			else {
 				if( op->bit < 4 )
-					m_Devices[id]->SetGPIO((int)op->bit,  op->val);
+					err = m_Devices[id]->SetGPIO((int)op->bit,  op->val);
 				else 
-					m_Devices[id+1]->SetGPIO((int)op->bit-4, op->val);
+					err = m_Devices[id+1]->SetGPIO((int)op->bit-4, op->val);
 			}
 		}
 		else {
 			//Lowbyte : con0,con1
 			if (con == IO_ALL_CON) {
 				for (int c = 0; c < IO_CON_MAX; c++)
-					SyncIO(c, &io_reqQue[i]);
+					err = SyncIO(c, &io_reqQue[i]);
 			}
 			else
-				SyncIO(con, &io_reqQue[i]);
+				err = SyncIO(con, &io_reqQue[i]);
 		}
+		if (err != FT_OK) {
+			ret = err;
+			break;
+		}
+	}
+	if (ret == FT_IO_ERROR) {
+		this->DoMount(false);
 	}
 	return ret;
 }
@@ -496,14 +502,14 @@ LRESULT CFtBoard::SyncIO(int con, IO_OP* op)
 		int id = m_BoardID;
 		IO_GPIO* ogpio = (IO_GPIO*)&op->val;
 		if (ogpio->israw) {
-			m_Devices[id]->SetGPIO(ogpio->val & 0xF);
-			m_Devices[id + 1]->SetGPIO((ogpio->val >> 4) & 0xF);
+			m_Devices[0]->SetGPIO(ogpio->val & 0xF);
+			m_Devices[1]->SetGPIO((ogpio->val >> 4) & 0xF);
 		}
 		else {
 			if (ogpio->bit < 4)
-				m_Devices[id]->SetGPIO((int)ogpio->bit, ogpio->val);
+				m_Devices[0]->SetGPIO((int)ogpio->bit, ogpio->val);
 			else
-				m_Devices[id + 1]->SetGPIO((int)ogpio->bit - 4, ogpio->val);
+				m_Devices[1]->SetGPIO((int)ogpio->bit - 4, ogpio->val);
 		}
 	}
 	else if (con == IO_ALL_CON) {
@@ -513,7 +519,7 @@ LRESULT CFtBoard::SyncIO(int con, IO_OP* op)
 	else {
 		int idx = con / 4;
 		if (idx < m_deviceNum) {
-			int id = m_BoardID + idx;
+			int id = 0 + idx;
 			LRESULT err = m_Devices[id]->SyncIO(CFtdiDriver::IO_WRITE, con % 4, op);
 			if (err != S_OK) {
 				logError(L"Process  IO Req faile with:%d(%s)", err, (LPCTSTR)ErrorString(err));
@@ -521,6 +527,9 @@ LRESULT CFtBoard::SyncIO(int con, IO_OP* op)
 			}
 			op->ret = err;
 		}
+	}
+	if (ret == FT_IO_ERROR) {
+		this->DoMount(false);
 	}
 	return ret;
 }
@@ -542,8 +551,8 @@ LRESULT CFtBoard::Display(int con, IO_VAL* io_val, int* items)
 	
 	if (con == IO_CON_GPIO) {
 		BYTE vl, vh;
-		m_Devices[m_BoardID]->GetRaw(&vl, NULL);
-		m_Devices[m_BoardID+1]->GetRaw(&vh, NULL);
+		m_Devices[0]->GetRaw(&vl, NULL);
+		m_Devices[1]->GetRaw(&vh, NULL);
 		vl = (((vh << 4) & 0xF0) | (vl & 0x0F));
 		IO_GPIO* vgpio = (IO_GPIO*)io_val;
 		vgpio[0].con = IO_CON_GPIO;
@@ -552,17 +561,17 @@ LRESULT CFtBoard::Display(int con, IO_VAL* io_val, int* items)
 	}
 	else if (con == IO_ALL_CON) {
 		BYTE val[4];
-		m_Devices[m_BoardID]->GetRaw(&val[0], &val[1]);
-		m_Devices[m_BoardID + 1]->GetRaw(&val[2], &val[3]);
+		m_Devices[0]->GetRaw(&val[0], &val[1]);
+		m_Devices[1]->GetRaw(&val[2], &val[3]);
 		for (int c = IO_CON0; c < IO_CON_MAX; c++) {
 			io_val[c].con = c;
 			char* pkey = (char *)io_val[c].pin;
 			IO_OP op = { m_index, pkey, (char)c, {0} };
 			if (c < 4) {
-				m_Devices[m_BoardID]->SyncIO(CFtdiDriver::IO_READ, c, &op, FALSE);
+				m_Devices[0]->SyncIO(CFtdiDriver::IO_READ, c, &op, FALSE);
 			}
 			else {
-				m_Devices[m_BoardID + 1]->SyncIO(CFtdiDriver::IO_READ, c-4, &op, FALSE);
+				m_Devices[1]->SyncIO(CFtdiDriver::IO_READ, c-4, &op, FALSE);
 			}
 		}
 		BYTE v = (((val[2] << 4) & 0xF0) | (val[0] & 0x0F));
@@ -576,10 +585,10 @@ LRESULT CFtBoard::Display(int con, IO_VAL* io_val, int* items)
 		char* pkey = (char*)io_val[0].pin;
 		IO_OP op = { m_index, pkey, con, {0} };
 		if (con < 4) {
-			m_Devices[m_BoardID]->SyncIO(CFtdiDriver::IO_READ, con, &op);
+			m_Devices[0]->SyncIO(CFtdiDriver::IO_READ, con, &op);
 		}
 		else {
-			m_Devices[m_BoardID+1]->SyncIO(CFtdiDriver::IO_READ, con-4, &op);
+			m_Devices[1]->SyncIO(CFtdiDriver::IO_READ, con-4, &op);
 		}
 	}
 	return S_OK;

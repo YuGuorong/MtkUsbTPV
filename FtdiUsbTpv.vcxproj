@@ -155,6 +155,7 @@
     <ClInclude Include="CFtDevice.h" />
     <ClInclude Include="CMainFrame.h" />
     <ClInclude Include="CPannel.h" />
+    <ClInclude Include="CPca9505.h" />
     <ClInclude Include="CSimpleLog.h" />
     <ClInclude Include="CUsbTPVApp.h" />
     <ClInclude Include="EnumSerial.h" />
@@ -181,6 +182,7 @@
     <ClCompile Include="CFtdiDriver.cpp" />
     <ClCompile Include="CMainFrame.cpp" />
     <ClCompile Include="CPannel.cpp" />
+    <ClCompile Include="CPca9505.cpp" />
     <ClCompile Include="CSimpleLog.cpp" />
     <ClCompile Include="CUsbTPVApp.cpp" />
     <ClCompile Include="EnumSerial.cpp" />

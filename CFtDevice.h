@@ -50,10 +50,11 @@ public:
 	INT m_deviceNum;
 	CString m_strPortInfo;
 	fdtiid m_BoardID;
-	map<fdtiid, CFtDevice*> m_Devices;
+	CFtDevice* m_Devices[4];
 	
 	void AddDevice(FT_DEVICE_LIST_INFO_NODE * pdevInfo, int open_idx);
 	void DoMount(BOOL bMount);
+	BOOL isMount() { return m_bMounted; };
 	
 	LRESULT SyncIO(vector<IO_OP>& io_reqQue);
 	LRESULT SyncIO(int con, IO_OP* op);
