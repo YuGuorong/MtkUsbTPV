@@ -77,7 +77,7 @@ protected:
 	LRESULT SyncIO(int mode, IO_OP* op);
 	static CFtdiDriver* m_InstFtdi;
 };
-
+#define IO_RAW    101
 #define CON_RAW   99
 #define GPIO_RAW     97
 #define GPIO_CTL     95

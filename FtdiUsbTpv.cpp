@@ -1,6 +1,5 @@
 ﻿// FtdiUsbTpv.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
 //
-
 #include "pch.h"
 #include "framework.h"
 #include "FtdiUsbTpv.h"
@@ -14,11 +13,9 @@
 #define new DEBUG_NEW
 #endif
 
-
+#define DEBUG_ARG 0
 // 唯一的应用程序对象
-
 CWinApp theApp;
-
 using namespace std;
 
 #define PARAM_INDEX    'i'
@@ -36,7 +33,7 @@ using namespace std;
 #define CMD_HELP       'h'
 
 
-const char* optstring = "vsdluhg:i:c:o:k:p:r";
+const char* optstring = "vdluhg:i:c:o:k:p:s:r";
 //required_argument
 const struct option long_options[] = {
     {"index",   optional_argument, NULL, 'i'},
@@ -45,8 +42,8 @@ const struct option long_options[] = {
     {"home" ,   optional_argument, NULL, 'o'},
     {"kcol",    optional_argument, NULL, 'k'},
     {"pwrkey",  optional_argument, NULL, 'p'},
-    {"raw",     optional_argument, NULL, 'r'},
-    {"set",     optional_argument, NULL, 's'},
+    {"raw",     required_argument, NULL, 'r'},
+    {"set",     required_argument, NULL, 's'},
     {"display", no_argument,       NULL, 'd'},
     {"list",    no_argument,       NULL, 'l'},
     {"gui",     no_argument,       NULL, 'u'},
@@ -68,8 +65,12 @@ char* testarg[] =
     "-h",
     "-v",
     "-l",
-    "-i", "1",
+    "-i", "0",
     "-c", "-1",
+    "-s", "0",
+    "-d",
+    "-s", "1",
+    "-d",
     "-k", "0",
     "-d",
     "-p", "0",
@@ -206,12 +207,12 @@ int server_entry(int argc, char** argv)
     IO_OP qk_req = def_request;
 
     CTpvBoard* pboard = NULL;
+
     if (argc <= 1) {
         {CMainFrame dlg; dlg.DoModal();     }
         //showHelp(argv[0]);
         return 1;
     }
-    
 
     while ((opt = getopt_long(argc, argv, optstring, long_options, &option_index)) != -1)
     {
@@ -241,7 +242,7 @@ int server_entry(int argc, char** argv)
         case PARAM_KCOL:   if (CHKIDX()) cur_req.val.v.pin[IO_KCOL] = argval;   break;
         case PARAM_PWRKEY: if (CHKIDX()) cur_req.val.v.pin[IO_PWRKEY] = argval; break;
         case PARAM_RAWVAL: if (CHKIDX()) qk_req=cur_req, qk_req.val.v.raw=atox(optarg, 1), qk_req.val.fmt= CON_RAW;  break;
-        case PARAM_SETVAL: if (CHKIDX()) qk_req=cur_req, qk_req.val.v.raw=argval==0? 0:0xFF, qk_req.val.fmt= CON_RAW; break;
+        case PARAM_SETVAL: if (CHKIDX()) qk_req = cur_req, qk_req.val.v.raw = argval == 0 ? 0 : 0xFF, qk_req.val.fmt = IO_RAW; break;
         case CMD_DISPLAY:  if (CHKIDX()) ProcIOReq(pboard, cur_req, io_reqQue);  DisplayConn(pboard, cur_req.val.con, boardindex); break;
         case CMD_LISTDEV: drvFdti.ShowDevices(); break;
         case CMD_GUI:     {CMainFrame dlg; dlg.DoModal();     }        break;
@@ -335,8 +336,11 @@ int main(int argc, char* argv[])
         return 1;
     }
     //::AfxInitRichEdit2();
-
-    return server_entry(argc, argv);
-    argc = sizeof(testarg)/ sizeof(char*);
+    //_CrtSetBreakAlloc(132); //383为上面内存泄漏的块号.
+#if DEBUG_ARG
+    argc = sizeof(testarg) / sizeof(char*);
     return server_entry(argc, testarg);
+#else
+    return server_entry(argc, argv);
+#endif
 }

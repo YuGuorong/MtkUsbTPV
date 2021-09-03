@@ -119,7 +119,15 @@ LRESULT CPca9505::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync)
 	IO_VAL * ioval = (IO_VAL*)&op->val;
 
 	if (mode == CFtdiDriver::IO_WRITE) {
-		if (con == IO_CON_GPIO) {
+		if (ioval->fmt == IO_RAW) {
+			DWORD rawv = ioval->v.raw;
+			for (int i = 0; i < IO_GROUP_MAX; i++) {
+				m_RegOP[i] = rawv;
+			}
+			bhwSync = TRUE;
+			op->ret = ERROR_NO_MORE_DEVICES;
+		}
+		else if (con == IO_CON_GPIO) {
 			
 			if (ioval->fmt == GPIO_RAW ) {
 				m_RegOP[4] = ioval->v.gpio.val;
@@ -129,23 +137,23 @@ LRESULT CPca9505::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync)
 				if(ioval->v.gpio.val )	m_RegOP[4] |= (1 << ioval->v.gpio.bit);
 			}
 		}
-		else if (ioval->fmt == CON_RAW) {
-			DWORD rawv = ioval->v.raw;
-			for (int i = 0; i < 4; i++) {
-				BYTE conval = ((BYTE)(rawv >> (i * 6))) & 0x3F;
-				m_RegOP[i] = conval;
-			}
-		}
 		else {
 			char* pin = ioval->v.pin;
 			int gpiobase = (con % 2) * IO_MAX_KEY;
 			BYTE* pcache = &m_RegOP[regbase];
+			if (ioval->fmt == CON_RAW) {
+				BYTE raw = ioval->v.raw;
+				for (int i = 0; i < IO_MAX_KEY; i++) {
+					pin[i] = raw  & (1 << i);
+				}
+				ioval->fmt = CON_CTL;
+			}
 
-			for (int i = 0; i < IO_MAX_KEY; i++, pin++) {
+			for (int i = 0; i < IO_MAX_KEY; i++) {
 				int gpionum = gpiobase + i;
-				if (*pin >= 0) { //the pin value 0 means donot change it.keep it stay its state.
+				if (pin[i] >= 0) { //the pin value 0 means donot change it.keep it stay its state.
 					*pcache &= ~(1 << gpionum);
-					if (*pin) {
+					if (pin[i]) {
 						*pcache |= 1 << gpionum;
 					}
 				}
@@ -154,7 +162,6 @@ LRESULT CPca9505::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync)
 		if (bhwSync) ftStatus = WriteReg(REG_PORT) ? S_OK : ERROR_WRITE_FAULT;
 	}
 	else {
-		op->ret = S_OK;
 		if (bhwSync) op->ret = UpdateRaw();
 		
 		if (con == IO_CON_GPIO) {
@@ -171,7 +178,7 @@ LRESULT CPca9505::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync)
 			}
 		}
 	}
-	return ftStatus == FT_OK ? S_OK : ftStatus;
+	return  (ftStatus == FT_OK) ? S_OK : ftStatus;
 }
 
 LRESULT CPca9505::UpdateRaw(void)

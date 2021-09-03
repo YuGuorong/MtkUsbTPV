@@ -388,11 +388,10 @@ void CPannel::SetCon(int id, int key)
 {
 	if (m_pBoard == NULL || m_pBoard->isMount() == FALSE) return;
 	IO_OP op = { IO_ALL_CON, NULL, {IO_ALL_CON, CON_CTL, {-1}} };
-	int con = IO_ALL_CON;
 	CGdipButton* pctl = (CGdipButton*)this->GetDlgItem(id);
 	op.val.v.pin[key] = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 0 : 1;
 	int img = op.val.v.pin[key] == 1 ? CGdipButton::STD_TYPE : CGdipButton::ALT_TYPE;
-	if (m_pBoard->SyncIO(con, &op) == S_OK) {
+	if (m_pBoard->SyncIO(IO_ALL_CON, &op) == S_OK) {
 		for (int i = 0; i < IO_CON_MAX; i++) {
 			int ctrlid = id + i * IO_MAX_KEY;
 			pctl = (CGdipButton*)this->GetDlgItem(ctrlid);
@@ -406,12 +405,11 @@ void CPannel::SetAll(char val)
 {
 	if (m_pBoard == NULL || m_pBoard->isMount() == FALSE ) return;
 	IO_OP op = { IO_ALL_CON, NULL, {IO_ALL_CON, CON_RAW, { -1}} , 0 };
-	memset(op.val.v.pin, val, 3);
-	int con = IO_ALL_CON;
+	op.val.v.raw = 0xFF;
 	IO_VAL* praw_req = (IO_VAL*)&op.val;
 
 	memset(&praw_req->v.raw, (val == 0) ? 0 : 0xFF, 3);
-	if (m_pBoard->SyncIO(con, &op) == S_OK) {
+	if (m_pBoard->SyncIO(IO_ALL_CON, &op) == S_OK) {
 		int img = val == 1 ? CGdipButton::STD_TYPE : CGdipButton::ALT_TYPE;
 		for (int i = 0; i < IO_CON_MAX * IO_MAX_KEY; i++) {
 			CGdipButton* pctl = (CGdipButton*)this->GetDlgItem(IDC_BTN_POWER_1 + i);

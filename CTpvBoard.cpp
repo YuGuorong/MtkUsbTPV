@@ -39,13 +39,13 @@ void CTpvBoard::DoMount(BOOL bMount)
 {
 	if (bMount != m_bMounted)
 	{
-		m_strPortInfo.Empty();
-		CString strInfo;
+		//m_strPortInfo.Empty();
+		TCHAR szInfo[32];
 		for (int i = 0; i < m_deviceNum; i++) {
 			if (bMount) {
 				m_Devices[i]->UpdateRaw();
-				strInfo.Format(L"%d", m_Devices[i]->m_ComPort);
-				m_strPortInfo = (m_strPortInfo.IsEmpty() ? strInfo : m_strPortInfo + L"/" + strInfo);
+				_stprintf_s(szInfo, 32, L"%s/%d", m_strPortInfo, m_Devices[i]->m_ComPort);
+				m_strPortInfo = szInfo;
 			}
 			else
 			{
@@ -71,13 +71,7 @@ LRESULT CTpvBoard::SyncIO(vector<IO_OP>& io_reqQue)
 		int con = io_reqQue[i].val.con;
 
 		//Lowbyte : con0,con1
-		if (con == IO_ALL_CON) {
-			for (int c = 0; c < IO_CON_MAX; c++)
-				err = SyncIO(c, &io_reqQue[i]);
-		}
-		else
-			err = SyncIO(con, &io_reqQue[i]);
-		
+		err = SyncIO(con, &io_reqQue[i]);		
 		if (err != FT_OK) {
 			ret = err;
 			break;
@@ -89,19 +83,22 @@ LRESULT CTpvBoard::SyncIO(vector<IO_OP>& io_reqQue)
 	return ret;
 }
 
-LRESULT CTpvBoard::SyncIO(int con, IO_OP* op)
+LRESULT CTpvBoard::SyncIO(int con, IO_OP* op, BOOL bSyncHW )
 {
 	LRESULT ret = S_OK;
 	if (con == IO_ALL_CON) {
-		for (int c = 0; c < IO_CON_MAX; c++)
-			SyncIO(c, op);
+		for (int c = 0; c < IO_CON_MAX; c++) {
+			if (SyncIO(c, op, c == (IO_CON_MAX - 1)) != S_OK) break;
+		}
 	}
 	else {
-		LRESULT err = m_Devices[0]->SyncIO(CFtdiDriver::IO_WRITE, con , op);
+		op->ret = S_OK;
+		LRESULT err = m_Devices[0]->SyncIO(CFtdiDriver::IO_WRITE, con , op, bSyncHW);
 		if (err != S_OK) {
 			logError(L"Process  IO Req faile with:%d(%s)", err, (LPCTSTR)ErrorString(err));
 			ret = err;
 		}
+		if (op->ret != S_OK) return op->ret;
 		op->ret = err;
 	}
 

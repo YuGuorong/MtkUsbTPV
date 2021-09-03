@@ -31,15 +31,16 @@ CFtdiDriver::CFtdiDriver()
 CFtdiDriver::~CFtdiDriver()
 {
 	Save();
-	m_BoardList.clear();
 	if (m_pDevInfoList) {
 		free(m_pDevInfoList);
 	}
 	map<int, CTpvBoard*>::iterator itor = m_BoardList.begin();
 	while (itor != m_BoardList.end()) {
 		delete itor->second;
-		m_BoardList.erase(itor);
+		//m_BoardList.erase(itor);
+		itor++;
 	}
+	m_BoardList.clear();
 	//if (m_InstFtdi != NULL) delete m_InstFtdi;
 }
 
