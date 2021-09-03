@@ -5,6 +5,7 @@
 //#include "MtkUsbTPV.h"
 #include "resource.h"
 #include "CPannel.h"
+#include "CTpvBoard.h"
 #include "afxdialogex.h"
 
 
@@ -50,7 +51,7 @@ END_MESSAGE_MAP()
 
 // CPannel 消息处理程序
 
-void CPannel::SetBoard(CFtBoard* board)
+void CPannel::SetBoard(CTpvBoard* board)
 {
 	m_pBoard = board;
 	if (m_pBoard != NULL) {
@@ -58,10 +59,10 @@ void CPannel::SetBoard(CFtBoard* board)
 		m_cbDevice.Clear();
 		m_cbDevice.ResetContent();
 		CFtdiDriver* drv = CFtdiDriver::GetDriver();
-		map<int, CFtBoard*>::iterator it;
+		map<int, CTpvBoard*>::iterator it;
 		int sel = -1;
 		for (it = drv->m_BoardList.begin(); it != drv->m_BoardList.end(); it++) {
-			CFtBoard* pboard = it->second;
+			CTpvBoard* pboard = it->second;
 			if (pboard->m_bMounted) {
 				CString str;
 				str.Format(L"%d-(COM %s)", pboard->m_index, pboard ->m_strPortInfo);//  > m_BoardID);
@@ -71,6 +72,7 @@ void CPannel::SetBoard(CFtBoard* board)
 		}
 		m_cbDevice.SetCurSel(sel - 1);
 		UpdateIoState();	
+		m_pBoard->Close();
 	}
 }
 
@@ -114,7 +116,7 @@ void CPannel::UpdateIoState()
 		for (int i = 0; i < items; i++) {
 			if(ioval[i].con == IO_CON_GPIO) {
 				int id = IDC_BTN_GPIO_1;
-				BYTE v = ((IO_GPIO*)ioval)[i].val;
+				BYTE v = ioval[i].v.gpio.val;
 				for (int i = 0; i < 8; i++) {
 					CGdipButton* pctl = (CGdipButton*)this->GetDlgItem(id+i);
 					pctl->SetImage((v & (1 << i)) ? CGdipButton::STD_TYPE : CGdipButton::ALT_TYPE);
@@ -122,7 +124,7 @@ void CPannel::UpdateIoState()
 			}
 			else {
 				int id = IDC_BTN_POWER_1 + i*IO_MAX_KEY;
-				char* pv = ioval[i].pin;
+				char* pv = ioval[i].v.pin;
 				for (int i = 0; i < IO_MAX_KEY; i++) {
 					CGdipButton* pctl = (CGdipButton*)this->GetDlgItem(id + i);
 					pctl->SetImage(pv[i] ? CGdipButton::STD_TYPE : CGdipButton::ALT_TYPE);
@@ -318,23 +320,23 @@ void CPannel::OnBnClickedGpioCtl(UINT id)
 
 
 		if (m_pBoard == NULL || m_pBoard->isMount() == FALSE ) return;
-		IO_OP op = { 0, NULL, {-1,-1,-1, -1} };
+		IO_OP op = def_request;
 		int con = IO_CON0;
 		if (id >= IDC_BTN_POWER_1 && id <= IDC_BTN_HOMEKEY_8) {
 			con = (id - IDC_BTN_POWER_1) / IO_MAX_KEY;
 			op.val.con = con;
 			int key = (id - IDC_BTN_POWER_1) - (con * IO_MAX_KEY);
 			//printf("con %d, key:%d\n", con, key);
-			op.val.pin[key] = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 1 : 0;
+			op.val.v.pin[key] = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 0 : 1;
 		}
 		else {
 			int bit = id - IDC_BTN_GPIO_1;
-			IO_GPIO* pv =(IO_GPIO*)&op.val;
+			IO_VAL* pv =(IO_VAL*)&op.val;
 			con = IO_CON_GPIO;
 			pv->con = con;
-			pv->israw = FALSE;
-			pv->bit = bit;
-			pv->val = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 1 : 0;
+			pv->fmt = GPIO_CTL;
+			pv->v.gpio.bit = bit;
+			pv->v.gpio.val = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 0 : 1;
 		}
 		if (m_pBoard->SyncIO(con, &op) == FT_OK) {
 
@@ -346,6 +348,7 @@ void CPannel::OnBnClickedGpioCtl(UINT id)
 			}
 			pctl->RedrawWindow();
 		}
+		m_pBoard->Close();
 	}
 }
 
@@ -360,14 +363,17 @@ void CPannel::OnBnClickedConset(UINT id)
 	int con = id - IDC_BTN_CON0;
 	CGdipButton* pctl = (CGdipButton*)this->GetDlgItem(con*3 + IDC_BTN_POWER_1);
 	if (pctl == NULL) return;
-	int val = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 0 : 1;
-	IO_OP op = { con, NULL, {con,val,val,val} };
+	char val = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 0 : 1;
+
+	IO_OP op = { 0, NULL, {con, CON_CTL, {-1} } };
+	memset(op.val.v.pin, val, 3);
 	m_pBoard->SyncIO(con, &op);
 
 	int img = val == 1 ? CGdipButton::STD_TYPE : CGdipButton::ALT_TYPE;
 	pctl->SetImage(img);
 	((CGdipButton*)(GetDlgItem(con*3 + IDC_BTN_KCOL0_1)))->SetImage(img);
 	((CGdipButton*)(GetDlgItem(con*3 + IDC_BTN_HOMEKEY_1)))->SetImage(img);
+	m_pBoard->Close();
 
 }
 
@@ -381,11 +387,11 @@ void CPannel::OnBnClickedBtnSetall()
 void CPannel::SetCon(int id, int key)
 {
 	if (m_pBoard == NULL || m_pBoard->isMount() == FALSE) return;
-	IO_OP op = { IO_ALL_CON, NULL, {IO_ALL_CON,-1,-1, -1} };
+	IO_OP op = { IO_ALL_CON, NULL, {IO_ALL_CON, CON_CTL, {-1}} };
 	int con = IO_ALL_CON;
 	CGdipButton* pctl = (CGdipButton*)this->GetDlgItem(id);
-	op.val.pin[key] = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 0 : 1;
-	int img = op.val.pin[key] == 1 ? CGdipButton::STD_TYPE : CGdipButton::ALT_TYPE;
+	op.val.v.pin[key] = (pctl->GetImage() == CGdipButton::STD_TYPE) ? 0 : 1;
+	int img = op.val.v.pin[key] == 1 ? CGdipButton::STD_TYPE : CGdipButton::ALT_TYPE;
 	if (m_pBoard->SyncIO(con, &op) == S_OK) {
 		for (int i = 0; i < IO_CON_MAX; i++) {
 			int ctrlid = id + i * IO_MAX_KEY;
@@ -393,16 +399,18 @@ void CPannel::SetCon(int id, int key)
 			pctl->SetImage(img);
 		}
 	}
+	m_pBoard->Close();
 }
 
-void CPannel::SetAll(int val)
+void CPannel::SetAll(char val)
 {
 	if (m_pBoard == NULL || m_pBoard->isMount() == FALSE ) return;
-	IO_OP op = { IO_ALL_CON, NULL, {IO_ALL_CON,val,val, val} , 0};
+	IO_OP op = { IO_ALL_CON, NULL, {IO_ALL_CON, CON_RAW, { -1}} , 0 };
+	memset(op.val.v.pin, val, 3);
 	int con = IO_ALL_CON;
-	IO_VAL_RAW* praw_req = (IO_VAL_RAW*)&op.val;
-	praw_req->rawInd = RAW_FARMAT;
-	praw_req->rawVal = val==0? 0 : 0xFFFF;
+	IO_VAL* praw_req = (IO_VAL*)&op.val;
+
+	memset(&praw_req->v.raw, (val == 0) ? 0 : 0xFF, 3);
 	if (m_pBoard->SyncIO(con, &op) == S_OK) {
 		int img = val == 1 ? CGdipButton::STD_TYPE : CGdipButton::ALT_TYPE;
 		for (int i = 0; i < IO_CON_MAX * IO_MAX_KEY; i++) {
@@ -411,21 +419,19 @@ void CPannel::SetAll(int val)
 		}
 		SetGpioRaw(val);
 	}
+	m_pBoard->Close();
 }
 
 void CPannel::SetGpioRaw(int val)
 {
 	if (m_pBoard == NULL || m_pBoard->isMount() == FALSE ) return;
-	IO_OP op = { IO_ALL_CON, NULL, {IO_ALL_CON,-1,-1, -1} };
-	int con = IO_ALL_CON;
 	CGdipButton* pctl = (CGdipButton*)this->GetDlgItem(IDC_BTN_GPIO_1);
-	IO_GPIO* pv = (IO_GPIO*)&op.val;
-	con = IO_CON_GPIO;
-	pv->con = con;
-	pv->israw = TRUE;
-	pv->bit = 0xFF;
-	pv->val = val == 0 ? 0 : 0xFF;
-	int img = pv->val == 0 ? CGdipButton::ALT_TYPE : CGdipButton::STD_TYPE;
+	IO_OP op = { IO_CON_GPIO, NULL, {IO_CON_GPIO, GPIO_RAW, {-1}} , 0 };
+	memset(op.val.v.pin, val, 3);
+	int con = IO_CON_GPIO;
+	op.val.v.gpio.bit = 0xFF;
+	op.val.v.gpio.val = val == 0 ? 0 : 0xFF;
+	int img = val == 0 ? CGdipButton::ALT_TYPE : CGdipButton::STD_TYPE;
 	if (m_pBoard->SyncIO(con, &op) == S_OK) {
 		for (int i = 0; i < IO_CON_MAX; i++) {
 			int ctrlid = IDC_BTN_GPIO_1 + i;
@@ -433,6 +439,7 @@ void CPannel::SetGpioRaw(int val)
 			pctl->SetImage(img);
 		}
 	}
+	m_pBoard->Close();
 }
 
 
@@ -471,7 +478,7 @@ void CPannel::OnCbnSelchangeComboDev()
 	m_cbDevice.GetLBText(index, str);
 	int idx = _ttoi(str);
 	LRESULT err;
-	CFtBoard* board = CFtdiDriver::GetDriver()->FindBoard(0, idx, &err);
+	CTpvBoard* board = CFtdiDriver::GetDriver()->FindBoard(0, idx, &err);
 	if (board) this->SetBoard(board);
 }
 

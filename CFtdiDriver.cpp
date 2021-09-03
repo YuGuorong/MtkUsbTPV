@@ -1,11 +1,14 @@
 #include "pch.h"
 #include "CFdtiDriver.h"
 #include "CFtDevice.h"
+#include "CTpvBoard.h"
+#include "CPca9505.h"
 #include "util.h"
 
 #define UNINIT_LCLID   (-597)
 
 
+const IO_OP def_request = { -1, NULL, {(BYTE)IO_CON_UNKNOWN ,CON_CTL , {(DWORD)-1}}, S_OK };
 
 CFtdiDriver* CFtdiDriver::m_InstFtdi = NULL;
 
@@ -32,7 +35,7 @@ CFtdiDriver::~CFtdiDriver()
 	if (m_pDevInfoList) {
 		free(m_pDevInfoList);
 	}
-	map<int, CFtBoard*>::iterator itor = m_BoardList.begin();
+	map<int, CTpvBoard*>::iterator itor = m_BoardList.begin();
 	while (itor != m_BoardList.end()) {
 		delete itor->second;
 		m_BoardList.erase(itor);
@@ -71,37 +74,12 @@ void CFtdiDriver::Load()
 
 void CFtdiDriver::Save()
 {
-#if 0
-	Json::Value jroot;
-	jroot["IndexMax"] = m_BoardIdxNum;
 
-	Json::Value jObject;
-	for (map<int, CFtBoard*>::const_iterator iter = m_BoardList.begin(); iter != m_BoardList.end(); ++iter)
-	{
-		CFtBoard* board = iter->second;
-		if (board) {
-			Json::Value jBoard;
-			jBoard["BoardID"] = board->m_BoardID;
-			jBoard["DeviceNum"] = board->m_deviceNum;
-			jBoard["Index"] = board->m_index;
-			jObject[iter->first] = jBoard;
-		}
-	}
-	jroot["Devices"] = jObject;
-
-	string sjson = jroot.toStyledString();
-	CFile fp;
-	if( fp.Open(L"devConfig.json", CFile::modeCreate|CFile::modeWrite) )
-	{
-		fp.Write(sjson.c_str(), sjson.length());
-		fp.Close();
-	}
-#endif
 }
 
-CFtBoard * CFtdiDriver::FindBoard(fdtiid id, int index, LRESULT * err)
+CTpvBoard * CFtdiDriver::FindBoard(fdtiid id, int index, LRESULT * err)
 {
-	for (map<int, CFtBoard*>::iterator it = m_BoardList.begin(); it != m_BoardList.end(); it++) {
+	for (map<int, CTpvBoard*>::iterator it = m_BoardList.begin(); it != m_BoardList.end(); it++) {
 		if ((index != -1 && it->second->m_index == index) || (id != 0 && it->second->m_BoardID == id)) {
 			if (err) {
 				*err = (it->second->m_bMounted == TRUE) ? S_OK : ERROR_MOUNT_POINT_NOT_RESOLVED;
@@ -115,7 +93,7 @@ CFtBoard * CFtdiDriver::FindBoard(fdtiid id, int index, LRESULT * err)
 
 void CFtdiDriver::ShowDevices(void)
 {
-	for (map<int, CFtBoard*>::iterator it = m_BoardList.begin(); it != m_BoardList.end(); it++) {
+	for (map<int, CTpvBoard*>::iterator it = m_BoardList.begin(); it != m_BoardList.end(); it++) {
 
 		printf("Board index: %d\r\n", it->second->m_index);
 		printf("      %s\r\n", it->second->m_bMounted ? "Mounted" : "Unmount");
@@ -129,19 +107,7 @@ void CFtdiDriver::ShowDevices(void)
 
 LRESULT CFtdiDriver::SyncIO(int mode, IO_OP* op)
 {
-	//while (op) {
-	//	LRESULT err = S_OK;
-	//	CFtBoard* board = FindBoard(op->index, &err);
-	//	if (err != S_OK) {
-	//		//logError(L"Find Board fail with %s", );
-	//		op->ret = err;
-	//	}
-	//	else {
-	//		op->ret = board->SyncIO(mode, op);
-	//	}
 
-	//	op++;
-	//}
 	return LRESULT();
 }
 
@@ -158,52 +124,25 @@ LRESULT CFtdiDriver::MountDevices()
 {
 	m_BoardList.clear();
 
-	// TODO: 在此处添加实现代码.
-	map<int, CFtBoard*>::iterator iter;
-	for (iter = m_BoardList.begin(); iter != m_BoardList.end(); iter++) {
-		iter->second->m_bcheckMount = FALSE;
-	}
-
 	INT lastLocId = UNINIT_LCLID;
 	int subChannels = 0;
 
-	CFtBoard * board = NULL;
+	CTpvBoard * board = NULL;
+
 	for (int i = 0; i < (int)m_DevChannels; i++) {
-		if ( lastLocId == UNINIT_LCLID) { //new board
-			switch (m_pDevInfoList[i].Type) {
-			case FT_DEVICE_2232H:
-			case FT_DEVICE_2232C:
-				subChannels = 1;				break;
-			case FT_DEVICE_4232H:
-				subChannels = 3;
-				break;
-			default:
-				subChannels = 0;
-				break;
+		if ( strcmp( m_pDevInfoList[i].SerialNumber ,"A") == 0) {
+			CPca9505* pdev = new CPca9505(&m_pDevInfoList[i], i);
+			if (pdev->CheckConfig()) {
+				board = new CTpvBoard(m_BoardIdxNum);
+				m_BoardList[m_BoardIdxNum] = board;
+				m_BoardIdxNum++;
+				board->AddDevice(pdev);
+				board->DoMount(TRUE);
 			}
-			if (subChannels) { //valid board
-				board = FindBoard(-1, i);
-				if (board == NULL) {
-					board = new CFtBoard(m_BoardIdxNum);
-					m_BoardList[m_BoardIdxNum] = board;
-					m_BoardIdxNum++;
-					board->AddDevice(&m_pDevInfoList[i], i);
-				}
-				board->m_bcheckMount = TRUE;
-
-			}
-			lastLocId = i;
-		} else {
-			if (subChannels) {
-				if (board) board->AddDevice(&m_pDevInfoList[i], i);
-				--subChannels;
-			}
-			lastLocId = (subChannels == 0) ? UNINIT_LCLID : i;
+			else
+				delete pdev;
 		}
-	}
 
-	for (iter = m_BoardList.begin(); iter != m_BoardList.end(); iter++) {
-		iter->second->DoMount(iter->second->m_bcheckMount);
 	}
 
 	return LRESULT(0);
@@ -220,15 +159,15 @@ LRESULT  CFtdiDriver::Scan(BOOL blog)
 	ftStatus = FT_CreateDeviceInfoList(&m_DevChannels);// Get the number of FTDI devices
 	if (ftStatus != FT_OK)// Did the command execute OK?
 	{
-		plog("Error in getting the number of devices\n");
+		logError(L"Error in getting the number of devices\n");
 		return FT_INSUFFICIENT_RESOURCES;
 	}
 	if (m_DevChannels < 1)// Exit if we don't see any
 	{
-		plog("There are no FTDI devices installed\n");
+		logError(L"There are no FTDI devices installed\n");
 		return FT_DEVICE_NOT_FOUND;
 	}
-	plog("%d FTDI devices channel found\n", m_DevChannels);
+	logInfo(L"%d FTDI devices channel found\n", m_DevChannels);
 
 	if (ftStatus == FT_OK) {
 		DWORD tempNumChannels = m_DevChannels + 1;
@@ -244,10 +183,10 @@ LRESULT  CFtdiDriver::Scan(BOOL blog)
 
 		// FT_ListDevices OK, product descriptions are in Buffer1 and Buffer2, and
 		// m_DevNum contains the number of devices connected
-		plog("Number of devices connected is: %d\n", m_DevChannels);
+		logInfo(L"Number of devices connected is: %d\n", m_DevChannels);
 	}
 	else {
-		plog("FTDI SDK load fail\n");
+		logError(L"FTDI SDK load fail\n");
 	}
 
 

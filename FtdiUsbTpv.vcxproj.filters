@@ -93,6 +93,12 @@
     <ClInclude Include="CPca9505.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="ftdi_common.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="CTpvBoard.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FtdiUsbTpv.cpp">
@@ -144,6 +150,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="CPca9505.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="CTpvBoard.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

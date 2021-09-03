@@ -31,7 +31,7 @@ public:
 	CComboBox m_cbDevice;
 
 protected:
-	CFtBoard* m_pBoard;
+	CTpvBoard* m_pBoard;
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
 	DECLARE_MESSAGE_MAP()
@@ -41,9 +41,9 @@ public:
 	afx_msg void OnClose();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 
-	void SetBoard(CFtBoard * board);
+	void SetBoard(CTpvBoard * board);
 	void SetCon(int id,  int key);
-	void SetAll(int val);
+	void SetAll(char val);
 	void SetGpioRaw(int val);
 	void UpdateIoState();
 	virtual BOOL OnInitDialog();

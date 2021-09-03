@@ -2,7 +2,7 @@
 #include "CFtDevice.h"
 #include "ftd2xx.h"
 #include "util.h"
-
+#include "ftdi_common.h"
 
 
 #define MID_ECHO_COMMAND_ONCE			0
@@ -55,7 +55,7 @@ CFtDevice::~CFtDevice()
 	}
 }
 
-LRESULT CFtDevice::ReadChn( int idx)
+LRESULT CFtDevice::UpdateRaw(void)
 {
 	if (m_ftHandle == INVALID_HANDLE_VALUE) return ERROR_DEVICE_NOT_AVAILABLE;
 	 FT_STATUS status;
@@ -94,8 +94,6 @@ LRESULT CFtDevice::ReadChn( int idx)
 	 return S_OK;
 }
 
-
-
 LRESULT CFtDevice::Write(int idx) {
 	if (m_ftHandle == INVALID_HANDLE_VALUE) return ERROR_DEVICE_NOT_AVAILABLE;
 	int dwNumBytesToSend = 0;			//Clear output buffer
@@ -124,27 +122,279 @@ LRESULT CFtDevice::Write(int idx) {
 	return S_OK;
 }
 
-LRESULT CFtDevice::GetRaw(BYTE* vl, BYTE* vh)
+// AD0 (SCL) is output driven low
+// AD1 (DATA OUT) is output high (open drain)
+// AD2 (DATA IN) is input (therefore the output value specified is ignored)
+// AD3 to AD7 are inputs driven high (not used in this application)
+void CFtDevice::SetI2CLinesIdle(void)
 {
-	ReadChn(0);
-	if (vl) {
-		*vl = m_lowByte;
+	if (m_ftHandle == INVALID_HANDLE_VALUE) return ;
+	int dwNumBytesToSend = 0;			//Clear output buffer
+	DWORD dwNumBytesSent = 0;
+	BYTE OutputBuffer[256];			//Buffer to hold MPSSE commands and data to be sent to FT232H
+
+	dwNumBytesToSend = 0;			//Clear output buffer
+
+	// Set the idle states for the AD lines
+	OutputBuffer[dwNumBytesToSend++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;	// Command to set directions of ADbus and data values for pins set as o/p
+	OutputBuffer[dwNumBytesToSend++] = 0xFF;    // Set all 8 lines to high level (only affects pins which are output)
+	OutputBuffer[dwNumBytesToSend++] = 0xFB;	// Set all pins as output except bit 2 which is the data_in
+
+	FT_Write(m_ftHandle, OutputBuffer, dwNumBytesToSend, &dwNumBytesSent);		//Send off the commands
+}
+
+void CFtDevice::SetI2CStart(void)
+{
+	if (m_ftHandle == INVALID_HANDLE_VALUE) return ;
+	int dwNumBytesToSend = 0;			//Clear output buffer
+	DWORD dwNumBytesSent = 0;
+	BYTE OutputBuffer[256];			//Buffer to hold MPSSE commands and data to be sent to FT232H
+	// Pull Data line low, leaving clock high (open-drain)
+	for (int dwCount = 0; dwCount < 4; dwCount++)	// Repeat commands to ensure the minimum period of the start hold time is achieved
+	{
+		OutputBuffer[dwNumBytesToSend++] = 0x80;	// Command to set directions of ADbus and data values for pins set as o/p
+		OutputBuffer[dwNumBytesToSend++] = 0xFD;	// Bring data out low (bit 1)
+		OutputBuffer[dwNumBytesToSend++] = 0xFB;	// Set all pins as output except bit 2 which is the data_in
 	}
 
-	if (vh) {
-		*vh = m_highByte;
+	// Pull Clock line low now, making both clcok and data low
+	for (int dwCount = 0; dwCount < 4; dwCount++)	// Repeat commands to ensure the minimum period of the start setup time is achieved
+	{
+		OutputBuffer[dwNumBytesToSend++] = 0x80; 	// Command to set directions of ADbus and data values for pins set as o/p
+		OutputBuffer[dwNumBytesToSend++] = 0xFC; 	// Bring clock line low too to make clock and data low
+		OutputBuffer[dwNumBytesToSend++] = 0xFB;	// Set all pins as output except bit 2 which is the data_in
 	}
 
-	return S_OK;
+	FT_Write(m_ftHandle, OutputBuffer, dwNumBytesToSend, &dwNumBytesSent);		//Send off the commands
+}
+
+void CFtDevice::SetI2CStop(void)
+{
+	if (m_ftHandle == INVALID_HANDLE_VALUE) return ;
+	int dwNumBytesToSend = 0;			//Clear output buffer
+	DWORD dwNumBytesSent = 0;
+	BYTE OutputBuffer[256];			//Buffer to hold MPSSE commands and data to be sent to FT232H
+	dwNumBytesToSend = 0;			//Clear output buffer
+	DWORD dwCount;
+
+	// Initial condition for the I2C Stop - Pull data low (Clock will already be low and is kept low)
+	for (dwCount = 0; dwCount < 4; dwCount++)		// Repeat commands to ensure the minimum period of the stop setup time is achieved
+	{
+		OutputBuffer[dwNumBytesToSend++] = 0x80;	// Command to set directions of ADbus and data values for pins set as o/p
+		OutputBuffer[dwNumBytesToSend++] = 0xFC;	// put data and clock low
+		OutputBuffer[dwNumBytesToSend++] = 0xFB;	// Set all pins as output except bit 2 which is the data_in
+	}
+
+	// Clock now goes high (open drain)
+	for (dwCount = 0; dwCount < 4; dwCount++)		// Repeat commands to ensure the minimum period of the stop setup time is achieved
+	{
+		OutputBuffer[dwNumBytesToSend++] = 0x80;	// Command to set directions of ADbus and data values for pins set as o/p
+		OutputBuffer[dwNumBytesToSend++] = 0xFD;	// put data low, clock remains high (open drain, pulled up externally)
+		OutputBuffer[dwNumBytesToSend++] = 0xFB;	// Set all pins as output except bit 2 which is the data_in
+	}
+
+	// Data now goes high too (both clock and data now high / open drain)
+	for (dwCount = 0; dwCount < 4; dwCount++)	// Repeat commands to ensure the minimum period of the stop hold time is achieved
+	{
+		OutputBuffer[dwNumBytesToSend++] = 0x80;	// Command to set directions of ADbus and data values for pins set as o/p
+		OutputBuffer[dwNumBytesToSend++] = 0xFF;	// both clock and data now high (open drain, pulled up externally)
+		OutputBuffer[dwNumBytesToSend++] = 0xFB;	// Set all pins as output except bit 2 which is the data_in
+	}
+	FT_Write(m_ftHandle, OutputBuffer, dwNumBytesToSend, &dwNumBytesSent);		//Send off the commands
+}
+
+BOOL CFtDevice::SendAddrAndCheckACK(BYTE dwDataSend, BOOL Read)
+{
+	if (m_ftHandle == INVALID_HANDLE_VALUE) return ERROR_DEVICE_NOT_AVAILABLE;
+	DWORD dwNumBytesSent = 0;
+	BYTE OutputBuffer[256], InputBuffer[16];			//Buffer to hold MPSSE commands and data to be sent to FT232H
+	DWORD dwNumBytesToSend = 0, dwNumBytesRead= 0;			//Clear output buffer
+	FT_STATUS ftStatus = FT_OK;
+	
+	dwDataSend = (Read == TRUE) ? ((dwDataSend << 1) | 0x01) : ((dwDataSend << 1) & 0xFE);
+
+	OutputBuffer[dwNumBytesToSend++] = 0x11; 		// command to clock data bytes out MSB first on clock falling edge
+	OutputBuffer[dwNumBytesToSend++] = 0x00;		// 
+	OutputBuffer[dwNumBytesToSend++] = 0x00;		// Data length of 0x0000 means 1 byte data to clock out
+	OutputBuffer[dwNumBytesToSend++] = dwDataSend;	// Actual byte to clock out
+
+	// Put I2C line back to idle (during transfer) state... Clock line driven low, Data line high (open drain)
+	OutputBuffer[dwNumBytesToSend++] = 0x80;		// Command to set lower 8 bits of port (ADbus 0-7 on the FT232H)
+	OutputBuffer[dwNumBytesToSend++] = 0xFE;		// Set the value of the pins (only affects those set as output)
+	OutputBuffer[dwNumBytesToSend++] = 0xFB;		// Set the directions - all pins as output except Bit2(data_in)
+
+	OutputBuffer[dwNumBytesToSend++] = 0x22; 	// Command to clock in bits MSB first on clock rising edge
+	OutputBuffer[dwNumBytesToSend++] = 0x00;	// Length of 0x00 means to scan in 1 bit
+
+	// This command then tells the MPSSE to send any results gathered back immediately
+	OutputBuffer[dwNumBytesToSend++] = 0x87;	//Send answer back immediate command
+
+	ftStatus = FT_Write(m_ftHandle, OutputBuffer, dwNumBytesToSend, &dwNumBytesSent);		//Send off the commands
+
+	//Check if ACK bit received by reading the byte sent back from the FT232H containing the ACK bit
+	ftStatus = FT_Read(m_ftHandle, InputBuffer, 1, &dwNumBytesRead);  	//Read one byte from device receive buffer
+	if ((ftStatus != FT_OK) || (dwNumBytesRead == 0) || ((InputBuffer[0] & 0x01) != 0x00))
+	{
+		logError(L"Failed to get ACK from I2C Slave \n");
+		return FALSE; //Error, can't get the ACK bit
+	}
+
+	return TRUE;		// Return True if the ACK was received
+}
+
+BOOL CFtDevice::SendByteAndCheckACK(BYTE dwDataSend)
+{
+	if (m_ftHandle == INVALID_HANDLE_VALUE) return ERROR_DEVICE_NOT_AVAILABLE;
+	DWORD dwNumBytesSent = 0;
+	BYTE OutputBuffer[256], InputBuffer[16];			//Buffer to hold MPSSE commands and data to be sent to FT232H
+	DWORD dwNumBytesToSend = 0, dwNumBytesRead = 0;			//Clear output buffer
+	FT_STATUS ftStatus = FT_OK;
+
+	OutputBuffer[dwNumBytesToSend++] = 0x11; 		// command to clock data bytes out MSB first on clock falling edge
+	OutputBuffer[dwNumBytesToSend++] = 0x00;		// 
+	OutputBuffer[dwNumBytesToSend++] = 0x00;		// Data length of 0x0000 means 1 byte data to clock out
+	OutputBuffer[dwNumBytesToSend++] = dwDataSend;	// Actual byte to clock out
+
+	// Put I2C line back to idle (during transfer) state... Clock line driven low, Data line high (open drain)
+	OutputBuffer[dwNumBytesToSend++] = 0x80;		// Command to set lower 8 bits of port (ADbus 0-7 on the FT232H)
+	OutputBuffer[dwNumBytesToSend++] = 0xFE;		// Set the value of the pins (only affects those set as output)
+	OutputBuffer[dwNumBytesToSend++] = 0xFB;		// Set the directions - all pins as output except Bit2(data_in)
+
+
+
+	OutputBuffer[dwNumBytesToSend++] = 0x22; 	// Command to clock in bits MSB first on clock rising edge
+	OutputBuffer[dwNumBytesToSend++] = 0x00;	// Length of 0x00 means to scan in 1 bit
+
+	// This command then tells the MPSSE to send any results gathered back immediately
+	OutputBuffer[dwNumBytesToSend++] = 0x87;	//Send answer back immediate command
+
+	ftStatus = FT_Write(m_ftHandle, OutputBuffer, dwNumBytesToSend, &dwNumBytesSent);		//Send off the commands
+
+	// ===============================================================
+	// Now wait for the byte which we read to come back to the host PC
+	// ===============================================================
+
+	DWORD dwNumInputBuffer = 0;
+	DWORD ReadTimeoutCounter = 0;
+	ftStatus = FT_GetQueueStatus(m_ftHandle, &dwNumInputBuffer);	// Get number of bytes in the input buffer
+	while ((dwNumInputBuffer < 1) && (ftStatus == FT_OK) && (ReadTimeoutCounter < 500))
+	{
+		ftStatus = FT_GetQueueStatus(m_ftHandle, &dwNumInputBuffer);	// Get number of bytes in the input buffer
+		ReadTimeoutCounter++;
+		Sleep(1);													// short delay
+	}
+
+	// If the loop above exited due to the byte coming back (not an error code and not a timeout)
+	if ((ftStatus == FT_OK) && (ReadTimeoutCounter < 500))
+	{
+		ftStatus = FT_Read(m_ftHandle, &InputBuffer, dwNumInputBuffer, &dwNumBytesRead); // Now read the data
+
+		if (((InputBuffer[0] & 0x01) == 0x00))		//Check ACK bit 0 on data byte read out
+		{
+			return TRUE;							// Return True if the ACK was received
+		}
+	}
+	return FALSE;									// Failed to get any data back or got an error code back
+
+
+}
+
+BOOL CFtDevice::ReadAndSendNAK(BYTE* pRdBuff, int ReadLen)
+{
+	if (m_ftHandle == INVALID_HANDLE_VALUE) return FALSE;
+	if (pRdBuff == NULL) return FALSE;
+	DWORD dwNumBytesSent = 0;
+	BYTE OutputBuffer[256];			//Buffer to hold MPSSE commands and data to be sent to FT232H
+	DWORD dwNumBytesToSend = 0, dwNumBytesRead = 0;			//Clear output buffer
+	FT_STATUS ftStatus = FT_OK;
+
+	for (int i = 0; i < ReadLen; i++) {
+		// Read the first byte of data over I2C and ACK it
+		//Clock one byte in
+		OutputBuffer[dwNumBytesToSend++] = 0x20; 		// Command to clock data byte in MSB first on clock rising edge
+		OutputBuffer[dwNumBytesToSend++] = 0x00;
+		OutputBuffer[dwNumBytesToSend++] = 0x00;		// Data length of 0x0000 means 1 byte data to clock in
+		// Clock out one bit...send ack bit as '0'
+		OutputBuffer[dwNumBytesToSend++] = 0x13;		// Command to clock data bit out MSB first on clock falling edge
+		OutputBuffer[dwNumBytesToSend++] = 0x00;		// Length of 0x00 means 1 bit
+		OutputBuffer[dwNumBytesToSend++] = (i==(ReadLen-1))? 0xFF: 0x00;		// Data value to clock out is in bit 7 of this value
+		// Put I2C line back to idle (during transfer) state... Clock line driven low, Data line high (open drain)
+		OutputBuffer[dwNumBytesToSend++] = 0x80;		// Command to set lower 8 bits of port (ADbus 0-7 on the FT232H)
+		OutputBuffer[dwNumBytesToSend++] = 0xFE;		// Set the value of the pins (only affects those set as output)
+		OutputBuffer[dwNumBytesToSend++] = 0xFB;		// Set the directions - all pins as output except Bit2(data_in)
+	}
+
+
+	// This command then tells the MPSSE to send any results gathered back immediately
+	OutputBuffer[dwNumBytesToSend++] = '\x87';		// Send answer back immediate command
+
+	ftStatus = FT_Write(m_ftHandle, OutputBuffer, dwNumBytesToSend, &dwNumBytesSent);		//Send off the commands
+
+	// ===============================================================
+	// Now wait for the 3 bytes which we read to come back to the host PC
+	// ===============================================================
+
+	DWORD dwNumInputBuffer = 0;
+	DWORD ReadTimeoutCounter = 0;
+
+	ftStatus = FT_GetQueueStatus(m_ftHandle, &dwNumInputBuffer);	// Get number of bytes in the input buffer
+
+	while ((dwNumInputBuffer < (DWORD)ReadLen) && (ftStatus == FT_OK) && (ReadTimeoutCounter < 500))
+	{
+		ftStatus = FT_GetQueueStatus(m_ftHandle, &dwNumInputBuffer);	// Get number of bytes in the input buffer
+		ReadTimeoutCounter++;
+		Sleep(1);													// short delay
+	}
+
+	// If the loop above exited due to the bytes coming back (not an error code and not a timeout)
+	// then read the bytes available and return True to indicate success
+	if ((ftStatus == FT_OK) && (ReadTimeoutCounter < 500))
+	{
+		ftStatus = FT_Read(m_ftHandle, pRdBuff, dwNumInputBuffer, &dwNumBytesRead); // Now read the data
+		return TRUE; // Indicate success
+	}
+	return FALSE;									// Failed to get any data back or got an error code back
+}
+
+BOOL CFtDevice::I2C_Write(BYTE chipAddr, BYTE regAddr, BYTE* pv, int len)
+{
+	//read back
+	SetI2CLinesIdle();								// Set idle line condition
+	SetI2CStart();
+	BOOL bSucceed = SendAddrAndCheckACK(chipAddr, FALSE);
+	if (bSucceed == 0) {
+		return FALSE;
+	}
+	bSucceed = SendByteAndCheckACK(regAddr);
+	for(int i=0; i<len && bSucceed; i++)
+		bSucceed = SendByteAndCheckACK(pv[i]);
+	SetI2CStop();
+	return bSucceed;
 }
 
 
-
-
-LRESULT CFtDevice::Set(int raw)
+BOOL CFtDevice::I2C_Read(BYTE chipAddr, BYTE regAddr, BYTE* pval, const int len)
 {
-	return LRESULT(0);
+	DWORD dwRead = len;
+	memset(pval, 0, dwRead);
+	//read back
+	SetI2CLinesIdle();								// Set idle line condition
+	SetI2CStart();
+	BOOL bSucceed = SendAddrAndCheckACK(chipAddr, FALSE);
+	if (bSucceed == 0) {
+		return FALSE;
+	}
+	bSucceed = SendByteAndCheckACK(regAddr);		
+	SetI2CLinesIdle();
+	SetI2CStart();    // Set idle line condition as part of repeated start
+
+	bSucceed = SendAddrAndCheckACK(chipAddr, TRUE);  	
+
+	BOOL ret = ReadAndSendNAK(pval, dwRead);		// Send the device address 0x22 rd (I2C = 0x45)
+	SetI2CStop();
+	return ret;
 }
+
 
 
 
@@ -156,18 +406,19 @@ LRESULT CFtDevice::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync )
 	FT_STATUS ftStatus = FT_OK;
 	
 	if (op->ret != S_OK) return op->ret;
-	IO_VAL_RAW* rawval = (IO_VAL_RAW*)&op->val;
+	IO_VAL* rawval = (IO_VAL*)&op->val;
 
 	if (mode == CFtdiDriver::IO_WRITE) {
-		if (rawval->rawInd == RAW_FARMAT ) {
-			DWORD rawv = rawval->rawVal << 4;;
+		if (rawval->fmt == CON_RAW ) {
+			DWORD rawv = *(DWORD*)(&rawval->v.pin);
+			rawv <<= 4;;
 			m_lowByte &= ~0xF0;
 			m_lowByte |= rawv & 0xF0;
 			m_highByte = (rawv >> 8) & 0xFF;
 			if( bhwSync) ftStatus = Write(3);
 		}
 		else {
-			char* pin = op->val.pin;
+			char* pin = op->val.v.pin;
 			for (int i = 0; i < IO_MAX_KEY; i++,pin++) {
 				int gpionum = gpiobase + i;
 				BYTE* pcache = (gpionum < 8) ? &m_lowByte : &m_highByte;
@@ -185,9 +436,9 @@ LRESULT CFtDevice::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync )
 	else {
 		op->ret = S_OK;
 
-		if (bhwSync) op->ret = ReadChn(0);
+		if (bhwSync) op->ret = UpdateRaw();
 
-		if (op->ext_val == NULL) op->ext_val = op->val.pin;
+		if (op->ext_val == NULL) op->ext_val = op->val.v.pin;
 		for (int i = 0; i < IO_MAX_KEY; i++, op->ext_val++) {
 			int gpionum = gpiobase + i;
 			BYTE* pcache = (gpionum < 8) ? &m_lowByte : &m_highByte;
@@ -286,7 +537,7 @@ int CFtDevice::isMpsseMode()
 
 LRESULT CFtDevice::Open()
 {
-	DWORD dwCount;
+	if (m_ftHandle != INVALID_HANDLE_VALUE) return S_OK;
 	FT_STATUS ftStatus;
 	// Open the UM232H module by it's description in the EEPROM
 	// Note: See FT_OpenEX in the D2xx Programmers Guide for other options available
@@ -296,7 +547,7 @@ LRESULT CFtDevice::Open()
 	// Check if Open was successful
 	if (ftStatus != FT_OK)
 	{
-		printf("Can't open FT232H device! \n");
+		logError(L"Can't open FT232H device! \n");
 		return 1;
 	}
 	else
@@ -307,7 +558,6 @@ LRESULT CFtDevice::Open()
 		BYTE InputBuffer[256];				// Buffer to hold Data bytes read from FT232H
 		DWORD dwNumInputBuffer;			// Number of bytes which we want to read
 		DWORD dwNumBytesRead;			// Number of bytes actually read
-		DWORD ReadTimeoutCounter;		// Used as a software timeout counter when the code checks the Queue Status
 
 
 		// #########################################################################################
@@ -326,10 +576,11 @@ LRESULT CFtDevice::Open()
 			FT_Read(m_ftHandle, &InputBuffer, dwNumInputBuffer, &dwNumBytesRead);
 		}
 
-		ftStatus = FT_GetComPortNumber(m_ftHandle, &m_ComPort);
+		if (m_ComPort == -1) {
+			ftStatus = FT_GetComPortNumber(m_ftHandle, &m_ComPort);
+			logInfo(L"Device COM port is: %d", m_ComPort);
+		}
 		UCHAR bInMpsseMode = isMpsseMode();
-		
-		logInfo(L"Device COM port is: %d", m_ComPort);
 		if ( bInMpsseMode != 0 ) {
 			ftStatus |= FT_SetUSBParameters(m_ftHandle, 65536, 65535);			// Set USB request transfer sizes
 			ftStatus |= FT_SetChars(m_ftHandle, false, 0, false, 0);				// Disable event and error characters
@@ -387,210 +638,18 @@ LRESULT CFtDevice::Open()
 
 		Sleep(20);																// Short delay 	
 	}
-	
-	//SetGpio(0x00, 0x00);
-	//SetGpio(0xFF, 0xFF);
-	ReadChn(0); //dumy read
-	ReadChn(0);
-
-	//FT_Close(m_ftHandle);
+	logInfo(L"Device_%d opened", m_OpenIndex);
 
 	return S_OK;
 }
 
 LRESULT CFtDevice::Close(void)
 {
-	FT_Close(m_ftHandle);
-	m_ftHandle = INVALID_HANDLE_VALUE;
+	if (m_ftHandle != INVALID_HANDLE_VALUE) {
+		FT_Close(m_ftHandle);
+		m_ftHandle = INVALID_HANDLE_VALUE;
+		logInfo(L"Device %d closed", m_OpenIndex);
+	}
 	return LRESULT(0);
-}
-
-
-CFtBoard::CFtBoard(int idx) {
-	m_index = idx;
-	m_deviceNum = 0;
-	m_strPortInfo = L"";
-	m_BoardID = (int)(((DWORD)-1)>>1);
-}
-
-CFtBoard::~CFtBoard()
-{
-	for (int i = 0; i < m_deviceNum; i++) {
-		delete m_Devices[i];
-	}
-	m_deviceNum = 0;
-}
-
-void CFtBoard::AddDevice(FT_DEVICE_LIST_INFO_NODE* pdevInfo, int open_idx)
-{
-	m_Devices[m_deviceNum] = new CFtDevice(pdevInfo, open_idx);
-	if ( m_deviceNum == 0  ) {
-		m_BoardID = (DWORD)m_Devices[m_deviceNum];
-	}
-	m_deviceNum++;
-}
-
-void CFtBoard::DoMount(BOOL bMount)
-{
-	if (bMount != m_bMounted) 
-	{
-		m_strPortInfo.Empty();
-		CString strInfo;
-		for(int i=0; i<m_deviceNum; i++){
-			if (bMount) {
-				LRESULT ret = m_Devices[i]->Open();
-				if (ret != S_OK) {
-					SetFaultError(ret);
-					return;
-				}
-				strInfo.Format(L"%d", m_Devices[i]->m_ComPort);
-				m_strPortInfo =  (m_strPortInfo.IsEmpty() ? strInfo : m_strPortInfo + L"/" + strInfo);
-			}
-			else
-			{
-				m_Devices[i]->Close();
-			}
-		}
-		m_bMounted = bMount;
-	}
-}
-
-LRESULT CFtBoard::SyncIO(vector<IO_OP>& io_reqQue)
-{
-	LRESULT ret = S_OK;
-	for (int i = 0; i < (int)io_reqQue.size(); i++) {
-		LRESULT err = S_OK;
-		int con = io_reqQue[i].val.con;
-		if (con == IO_CON_GPIO) {
-			int id = 0 ;
-			IO_GPIO*op = (IO_GPIO * )&io_reqQue[i].val;
-			if ( op->israw ) {
-				err = m_Devices[id]->SetGPIO(op->val & 0xF);
-				if( err == FT_OK ) m_Devices[id+1]->SetGPIO( (op->val>>4) & 0xF);
-			}
-			else {
-				if( op->bit < 4 )
-					err = m_Devices[id]->SetGPIO((int)op->bit,  op->val);
-				else 
-					err = m_Devices[id+1]->SetGPIO((int)op->bit-4, op->val);
-			}
-		}
-		else {
-			//Lowbyte : con0,con1
-			if (con == IO_ALL_CON) {
-				for (int c = 0; c < IO_CON_MAX; c++)
-					err = SyncIO(c, &io_reqQue[i]);
-			}
-			else
-				err = SyncIO(con, &io_reqQue[i]);
-		}
-		if (err != FT_OK) {
-			ret = err;
-			break;
-		}
-	}
-	if (ret == FT_IO_ERROR) {
-		this->DoMount(false);
-	}
-	return ret;
-}
-
-LRESULT CFtBoard::SyncIO(int con, IO_OP* op)
-{
-	LRESULT ret = S_OK;
-	if (con == IO_CON_GPIO) {
-		int id = m_BoardID;
-		IO_GPIO* ogpio = (IO_GPIO*)&op->val;
-		if (ogpio->israw) {
-			m_Devices[0]->SetGPIO(ogpio->val & 0xF);
-			m_Devices[1]->SetGPIO((ogpio->val >> 4) & 0xF);
-		}
-		else {
-			if (ogpio->bit < 4)
-				m_Devices[0]->SetGPIO((int)ogpio->bit, ogpio->val);
-			else
-				m_Devices[1]->SetGPIO((int)ogpio->bit - 4, ogpio->val);
-		}
-	}
-	else if (con == IO_ALL_CON) {
-		for (int c = 0; c < IO_CON_MAX; c++)
-			SyncIO(c, op);
-	}
-	else {
-		int idx = con / 4;
-		if (idx < m_deviceNum) {
-			int id = 0 + idx;
-			LRESULT err = m_Devices[id]->SyncIO(CFtdiDriver::IO_WRITE, con % 4, op);
-			if (err != S_OK) {
-				logError(L"Process  IO Req faile with:%d(%s)", err, (LPCTSTR)ErrorString(err));
-				ret = err;
-			}
-			op->ret = err;
-		}
-	}
-	if (ret == FT_IO_ERROR) {
-		this->DoMount(false);
-	}
-	return ret;
-}
-
-
-LRESULT CFtBoard::Display(int con, IO_VAL* io_val, int* items)
-{
-	if (con == IO_CON_GPIO) {
-		*items = 1;
-	}
-	else  if (con == IO_ALL_CON){
-		*items = 1 + 8;
-	}
-	else {
-		*items = 1;
-	}
-	if (io_val == NULL) return ERROR_INVALID_ADDRESS;
-
-	
-	if (con == IO_CON_GPIO) {
-		BYTE vl, vh;
-		m_Devices[0]->GetRaw(&vl, NULL);
-		m_Devices[1]->GetRaw(&vh, NULL);
-		vl = (((vh << 4) & 0xF0) | (vl & 0x0F));
-		IO_GPIO* vgpio = (IO_GPIO*)io_val;
-		vgpio[0].con = IO_CON_GPIO;
-		vgpio[0].bit = 0xFF;
-		vgpio[0].val = vl;
-	}
-	else if (con == IO_ALL_CON) {
-		BYTE val[4];
-		m_Devices[0]->GetRaw(&val[0], &val[1]);
-		m_Devices[1]->GetRaw(&val[2], &val[3]);
-		for (int c = IO_CON0; c < IO_CON_MAX; c++) {
-			io_val[c].con = c;
-			char* pkey = (char *)io_val[c].pin;
-			IO_OP op = { m_index, pkey, (char)c, {0} };
-			if (c < 4) {
-				m_Devices[0]->SyncIO(CFtdiDriver::IO_READ, c, &op, FALSE);
-			}
-			else {
-				m_Devices[1]->SyncIO(CFtdiDriver::IO_READ, c-4, &op, FALSE);
-			}
-		}
-		BYTE v = (((val[2] << 4) & 0xF0) | (val[0] & 0x0F));
-		IO_GPIO* vgpio = (IO_GPIO*)&io_val[IO_CON_MAX];
-		vgpio->con = IO_CON_GPIO;
-		vgpio->bit = 0xFF;
-		vgpio->val = v;
-
-	}
-	else {
-		char* pkey = (char*)io_val[0].pin;
-		IO_OP op = { m_index, pkey, con, {0} };
-		if (con < 4) {
-			m_Devices[0]->SyncIO(CFtdiDriver::IO_READ, con, &op);
-		}
-		else {
-			m_Devices[1]->SyncIO(CFtdiDriver::IO_READ, con-4, &op);
-		}
-	}
-	return S_OK;
 }
 

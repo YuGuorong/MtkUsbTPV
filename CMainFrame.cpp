@@ -109,7 +109,7 @@ BOOL CMainFrame::OnInitDialog()
 		CREATE_SUB_WND(dlg, CPannel, frame);
 
 		LRESULT err;
-		CFtBoard* pboard = CFtdiDriver::GetDriver()->FindBoard(-1, i, &err);
+		CTpvBoard* pboard = CFtdiDriver::GetDriver()->FindBoard(-1, i, &err);
 		if (pboard) {
 			dlg->SetBoard(pboard);
 		}

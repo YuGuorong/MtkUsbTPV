@@ -157,12 +157,14 @@
     <ClInclude Include="CPannel.h" />
     <ClInclude Include="CPca9505.h" />
     <ClInclude Include="CSimpleLog.h" />
+    <ClInclude Include="CTpvBoard.h" />
     <ClInclude Include="CUsbTPVApp.h" />
     <ClInclude Include="EnumSerial.h" />
     <ClInclude Include="ExDialog.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="ftd2xx.h" />
     <ClInclude Include="FtdiUsbTpv.h" />
+    <ClInclude Include="ftdi_common.h" />
     <ClInclude Include="getopt.h" />
     <ClInclude Include="InvokeExternalExe.h" />
     <ClInclude Include="pch.h" />
@@ -184,6 +186,7 @@
     <ClCompile Include="CPannel.cpp" />
     <ClCompile Include="CPca9505.cpp" />
     <ClCompile Include="CSimpleLog.cpp" />
+    <ClCompile Include="CTpvBoard.cpp" />
     <ClCompile Include="CUsbTPVApp.cpp" />
     <ClCompile Include="EnumSerial.cpp" />
     <ClCompile Include="ExDialog.cpp" />

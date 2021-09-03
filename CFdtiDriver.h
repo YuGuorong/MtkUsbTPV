@@ -1,8 +1,10 @@
 #pragma once
 #include "ftd2xx.h"
+#include "ftdi_common.h"
 #include <vector>
 #include <map>
 #include "CSimpleLog.h"
+
 
 using namespace std;
 typedef  DWORD  fdtiid;
@@ -12,8 +14,7 @@ typedef int (*fLog)(const char* fmt, ...);
 using namespace std;
 class CFtdiDriver;
 class CFtDevice;
-class CFtBoard;
-
+class CTpvBoard;
 
 
 const LPCTSTR strCustomKeys[] = {
@@ -56,7 +57,7 @@ public:
 	DWORD  m_DevChannels;
 	FT_DEVICE_LIST_INFO_NODE* m_pDevInfoList;
 	
-	map<int, CFtBoard*> m_BoardList;
+	map<int, CTpvBoard*> m_BoardList;
 	int m_BoardIdxNum;
 public:
 	CFtdiDriver();
@@ -70,32 +71,31 @@ public:
 	void  Load();
 	void  Save();
 
-	CFtBoard *FindBoard(fdtiid id, int index, LRESULT* err = NULL);
+	CTpvBoard *FindBoard(fdtiid id, int index, LRESULT* err = NULL);
 	void ShowDevices(void);
 protected:
 	LRESULT SyncIO(int mode, IO_OP* op);
 	static CFtdiDriver* m_InstFtdi;
 };
 
-#define RAW_FARMAT   99
+#define CON_RAW   99
+#define GPIO_RAW     97
+#define GPIO_CTL     95
+#define CON_CTL      93
 
-typedef struct te_io_gpio {
-	char con;
-	BYTE israw;
-	BYTE bit;
+typedef struct te_gpio_val {
+	char bit;
 	BYTE val;
-}IO_GPIO;
-
-#define RAW_FARMAT   99
-typedef struct te_io_raw {
-	char con;
-	BYTE rawInd; //RAW_FARMAT 
-	WORD rawVal;
-}IO_VAL_RAW;
+}GPIO_VAL;
 
 typedef struct te_io_val {
 	char con;
-	char pin[IO_MAX_KEY];
+	BYTE fmt; //CON_RAW CON_RAW, GPIO_RAW, GPIO, c
+	union {
+		DWORD raw;
+		GPIO_VAL gpio;
+		char pin[IO_MAX_KEY];
+	}v;
 }IO_VAL;
 
 typedef struct te_op_io {
@@ -104,3 +104,5 @@ typedef struct te_op_io {
 	IO_VAL val;
 	LRESULT ret;
 }IO_OP;
+
+extern const IO_OP def_request;

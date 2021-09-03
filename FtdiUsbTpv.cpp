@@ -8,6 +8,7 @@
 
 #include "getopt.h"
 #include "CFtDevice.h"
+#include "CTpvBoard.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -119,13 +120,13 @@ void showHelp(char* app)
 }
 
 
-const IO_OP def_request = { -1, NULL, {(BYTE)IO_CON_UNKNOWN ,-1, -1, -1}, S_OK };
-LRESULT ProcIOReq(CFtBoard * pboard, IO_OP& cur_req, vector<IO_OP>& io_reqQue) {
+
+LRESULT ProcIOReq(CTpvBoard * pboard, IO_OP& cur_req, vector<IO_OP>& io_reqQue) {
 
     if (pboard != NULL) {
-        if (memcmp(cur_req.val.pin, "\xFF\xFF\xFF", 3) != 0) {
+        if (memcmp(cur_req.val.v.pin, "\xFF\xFF\xFF", 3) != 0) {
             io_reqQue.push_back(cur_req);
-            memset(cur_req.val.pin, 0xFF, 3);
+            memset(cur_req.val.v.pin, 0xFF, 3);
         }
         pboard->SyncIO(io_reqQue);
         io_reqQue.clear();
@@ -135,7 +136,7 @@ LRESULT ProcIOReq(CFtBoard * pboard, IO_OP& cur_req, vector<IO_OP>& io_reqQue) {
     return 0;
 }
 
-void DisplayConn(CFtBoard * board, char con, int index) {
+void DisplayConn(CTpvBoard * board, char con, int index) {
     if (board == NULL) {
         printf("not found the index board: %d ", index);
     }
@@ -149,7 +150,7 @@ void DisplayConn(CFtBoard * board, char con, int index) {
         BOOL hdrPrinted = FALSE;
         for (int i = 0; i < items; i++) {
             if (ioval[i].con == IO_CON_GPIO) {
-                BYTE v = ((IO_GPIO*)ioval)[i].val;
+                BYTE v = ioval[i].v.gpio.val;
                 printf("GPIO:  7  6  5  4 - 3  2  1  0\n"
                     "       %d  %d  %d  %d - %d  %d  %d  %d\n",
                     !(!(v & 0x80)), !(!(v & 0x40)), !(!(v & 0x20)), !(!(v & 0x10)),
@@ -161,8 +162,7 @@ void DisplayConn(CFtBoard * board, char con, int index) {
                     printf("      | HOME | KCOL | PWRKEY| \n");
                     //printf("------------------------------\n");
                 }
-                char* pv = ioval[i].pin;
-
+                char* pv = ioval[i].v.pin;
                 printf("CON%d: |   %d  |   %d  |   %d   |\n", 
                     ioval[i].con, pv[IO_HOME], pv[IO_KCOL], pv[IO_PWRKEY]);
             }
@@ -203,10 +203,9 @@ int server_entry(int argc, char** argv)
     vector<IO_OP>io_reqQue;
     
     IO_OP cur_req = def_request;
-    IO_VAL_RAW* praw_req = (IO_VAL_RAW*)&cur_req.val;
-    IO_GPIO* gpio_req = (IO_GPIO*)&cur_req.val;
+    IO_OP qk_req = def_request;
 
-    CFtBoard* pboard = NULL;
+    CTpvBoard* pboard = NULL;
     if (argc <= 1) {
         {CMainFrame dlg; dlg.DoModal();     }
         //showHelp(argv[0]);
@@ -238,24 +237,22 @@ int server_entry(int argc, char** argv)
             cur_req.val.con = argval;
             break;
 
-        case PARAM_HOME:   if (CHKIDX()) cur_req.val.pin[IO_HOME] = argval;   break;
-        case PARAM_KCOL:   if (CHKIDX()) cur_req.val.pin[IO_KCOL] = argval;   break;
-        case PARAM_PWRKEY: if (CHKIDX()) cur_req.val.pin[IO_PWRKEY] = argval; break;
-        case PARAM_RAWVAL: if (CHKIDX()) praw_req->rawInd = RAW_FARMAT, praw_req->rawVal = argval;  break;
-        case PARAM_SETVAL: if (CHKIDX()) praw_req->rawInd = RAW_FARMAT, praw_req->rawVal = argval ? 0xFFFF : 0; break;
+        case PARAM_HOME:   if (CHKIDX()) cur_req.val.v.pin[IO_HOME] = argval;   break;
+        case PARAM_KCOL:   if (CHKIDX()) cur_req.val.v.pin[IO_KCOL] = argval;   break;
+        case PARAM_PWRKEY: if (CHKIDX()) cur_req.val.v.pin[IO_PWRKEY] = argval; break;
+        case PARAM_RAWVAL: if (CHKIDX()) qk_req=cur_req, qk_req.val.v.raw=atox(optarg, 1), qk_req.val.fmt= CON_RAW;  break;
+        case PARAM_SETVAL: if (CHKIDX()) qk_req=cur_req, qk_req.val.v.raw=argval==0? 0:0xFF, qk_req.val.fmt= CON_RAW; break;
         case CMD_DISPLAY:  if (CHKIDX()) ProcIOReq(pboard, cur_req, io_reqQue);  DisplayConn(pboard, cur_req.val.con, boardindex); break;
         case CMD_LISTDEV: drvFdti.ShowDevices(); break;
         case CMD_GUI:     {CMainFrame dlg; dlg.DoModal();     }        break;
         case CMD_VERSION: printf("version : 1.0.0.1\r\n"); break;
         case PARAM_GPIO:  
             if (CHKIDX()) {
-                IO_VAL ov = cur_req.val;
-                gpio_req->con = IO_CON_GPIO;
-                gpio_req->israw = TRUE;
-                gpio_req->bit = 0xFF;
-                gpio_req->val = atox(optarg, 1);
-                io_reqQue.push_back(cur_req);
-                cur_req.val = ov;
+                qk_req = cur_req;
+                qk_req.val.con = IO_CON_GPIO;
+                qk_req.val.fmt = GPIO_RAW;
+                qk_req.val.v.gpio.bit = 0xFF;
+                qk_req.val.v.gpio.val = atox(optarg, 1);
             }
             break;
         case CMD_HELP:showHelp(argv[0]); break;
@@ -263,14 +260,16 @@ int server_entry(int argc, char** argv)
             break;
         }
         if (opt >= '0' && opt <= '7' && CHKIDX()) {
-            IO_VAL ov = cur_req.val;
-            gpio_req->con = IO_CON_GPIO;
-            gpio_req->israw = FALSE;
-            gpio_req->bit = opt - '0';
-            gpio_req->val = argval;
+            qk_req = cur_req;
+            qk_req.val.con = IO_CON_GPIO;
+            qk_req.val.fmt = GPIO_CTL;
+            qk_req.val.v.gpio.bit = opt - '0';
+            qk_req.val.v.gpio.val = argval;
+        }
 
-            io_reqQue.push_back(cur_req);
-            cur_req.val = ov;
+        if (qk_req.index != -1 ) {
+            io_reqQue.push_back(qk_req);
+            qk_req = def_request;
         }
 
         if (err = GetFaultError()) {
