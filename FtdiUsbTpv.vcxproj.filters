@@ -16,6 +16,12 @@
     <Filter Include="uilib">
       <UniqueIdentifier>{19fc787f-295f-4bfd-8299-3c12a4def749}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Extern">
+      <UniqueIdentifier>{4e7eb0c2-e2be-4a9c-ad2a-ccd9455c0543}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Extern\jsoncpp">
+      <UniqueIdentifier>{e87809b9-4aa3-44aa-8b1e-4d7926382925}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -154,6 +160,15 @@
     </ClCompile>
     <ClCompile Include="CTpvBoard.cpp">
       <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="jsoncpp\src\json_reader.cpp">
+      <Filter>Extern\jsoncpp</Filter>
+    </ClCompile>
+    <ClCompile Include="jsoncpp\src\json_value.cpp">
+      <Filter>Extern\jsoncpp</Filter>
+    </ClCompile>
+    <ClCompile Include="jsoncpp\src\json_writer.cpp">
+      <Filter>Extern\jsoncpp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
