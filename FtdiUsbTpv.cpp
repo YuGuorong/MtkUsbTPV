@@ -186,11 +186,47 @@ BOOL ChkIdx(int index) {
     return TRUE;
 }
 #define CHKIDX() ChkIdx(cur_req.index )
+
+int bard_cfg = 0;
+void checkenv(int argc, char** argv) {
+    int opt;
+    int digit_optind = 0;
+    int option_index = 0;
+    int boardindex = -1;
+    int master = 0;
+    optind = 0;
+    if (argc <= 1) return;
+    char** narg = new char* [argc + 1];
+    for (int i = 0; i < argc; i++) {
+        narg[i] = new char[strlen(argv[i])+ 1];
+        strcpy(narg[i], argv[i]);
+    }
+
+    while ((opt = getopt_long(argc, argv, optstring, long_options, &option_index)) != -1)
+    {
+        int argval = (optarg == NULL) ? 0 : atoi(optarg);
+
+        switch (opt) {
+        case CMD_SWITCH:
+            bard_cfg = argval;
+            logInfo(L"board switch:%X", argval);
+            break;
+        
+        }
+    }
+
+    for (int i = 0; i < argc; i++) delete[] narg[i];
+    delete[] narg;
+
+}
+
 int server_entry(int argc, char** argv)
 {
     int nRetCode = 0;
     LRESULT err;
     InitLog();
+    optind = 0;
+    checkenv(argc, argv);
     LPWSTR szargs = GetCommandLineW();
     logTrace(L"Program start with arg(%d): [%s]", argc, szargs);
 
@@ -331,7 +367,6 @@ LONG ApplicationCrashHandler(EXCEPTION_POINTERS* pException)
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-
 int main(int argc, char* argv[])
 {
     SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)ApplicationCrashHandler);
@@ -343,6 +378,9 @@ int main(int argc, char* argv[])
         wprintf(L"错误: GetModuleHandle 失败\n");
         return 1;
     }
+    _CrtMemState s1, s2, s3;
+    _CrtMemCheckpoint(&s1);
+
 
     // 初始化 MFC 并在失败时显示错误
     if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0))
@@ -351,12 +389,24 @@ int main(int argc, char* argv[])
         wprintf(L"错误: MFC 初始化失败\n");
         return 1;
     }
+
+
+   
     //::AfxInitRichEdit2();
     //_CrtSetBreakAlloc(132); //383为上面内存泄漏的块号.
 #if DEBUG_ARG
     argc = sizeof(testarg) / sizeof(char*);
-    return server_entry(argc, testarg);
+    int ret =  server_entry(argc, testarg);
 #else
-    return server_entry(argc, argv);
+    int ret = server_entry(argc, argv);
 #endif
+
+    _CrtMemCheckpoint(&s2);
+
+    if (_CrtMemDifference(&s3, &s1, &s2)) {
+        _CrtMemDumpStatistics(&s3);
+        _CrtDumpMemoryLeaks();
+    }
+
+    return ret;
 }
