@@ -200,6 +200,7 @@ int server_entry(int argc, char** argv)
     int digit_optind = 0;
     int option_index = 0;
     int boardindex = -1;
+    int master = 0;
 
     vector<IO_OP>io_reqQue;
     
@@ -226,8 +227,11 @@ int server_entry(int argc, char** argv)
             cur_req.index = argval;
             boardindex = argval;
             pboard = drvFdti.FindBoard(0, argval, &err);
-            if (pboard == NULL) SetFaultError(err);
-            break;
+            if ( pboard ) 
+                pboard->SelMaster(master);
+            else
+                SetFaultError(err);
+             break;
         case PARAM_CON:
             if (optarg == NULL) argval = -1;
             if (cur_req.val.con >= IO_ALL_CON) {
@@ -246,7 +250,7 @@ int server_entry(int argc, char** argv)
         case CMD_DISPLAY:  if (CHKIDX()) ProcIOReq(pboard, cur_req, io_reqQue);  DisplayConn(pboard, cur_req.val.con, boardindex); break;
         case CMD_LISTDEV: drvFdti.ShowDevices(); break;
         case CMD_GUI:     {CMainFrame dlg; dlg.DoModal();     }        break;
-        case CMD_VERSION: printf("version : 1.0.0.1\r\n"); break;
+        case CMD_VERSION: printf("version : 2.0.0.1\r\n"); break;
         case PARAM_GPIO:  
             if (CHKIDX()) {
                 qk_req = cur_req;
@@ -257,6 +261,14 @@ int server_entry(int argc, char** argv)
             }
             break;
         case CMD_HELP:showHelp(argv[0]); break;
+        case CMD_SEL_MASTER: 
+            if (optarg == NULL) argval = 0;
+            if (argval <= 1) {
+                if (master != argval) ProcIOReq(pboard, cur_req, io_reqQue);
+                master = argval;
+                if (pboard) pboard->SelMaster(master);
+            }
+            break;
         case '?':
             break;
         }
