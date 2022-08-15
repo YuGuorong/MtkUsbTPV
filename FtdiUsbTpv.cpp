@@ -31,9 +31,11 @@ using namespace std;
 #define CMD_GUI        'u'
 #define CMD_VERSION    'v'
 #define CMD_HELP       'h'
+#define CMD_SEL_MASTER 'm'
+#define CMD_SWITCH     'w'
 
 
-const char* optstring = "vdluhg:i:c:o:k:p:s:r";
+const char* optstring = "vdluhg:i:c:o:k:p:s:r:m:";
 //required_argument
 const struct option long_options[] = {
     {"index",   optional_argument, NULL, 'i'},
@@ -57,12 +59,14 @@ const struct option long_options[] = {
     {"gpio5",   required_argument, NULL, '5'},
     {"gpio6",   required_argument, NULL, '6'},
     {"gpio7",   required_argument, NULL, '7'},
+    {"master",  required_argument, NULL, 'm'},
     {0, 0, 0, 0}
 };
 
 char* testarg[] =
 {
     "-h",
+    "-m", "1",
     "-v",
     "-l",
     "-i", "0",
