@@ -42,6 +42,7 @@ protected:
 	
 public:
 	int isMpsseMode();
+	virtual void SetAttribute(char* attr, int id);
 };
 
 

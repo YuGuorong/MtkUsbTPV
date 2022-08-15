@@ -141,4 +141,11 @@ LRESULT CTpvBoard::Display(int con, IO_VAL* io_val, int* items)
 	return S_OK;
 }
 
+LRESULT CTpvBoard::SelMaster(int id) {
+	for (int i = 0; i < m_deviceNum; i++) {
+		(m_Devices[i])->SetAttrib("master", id);
+	}
+	return S_OK;
+}
+
 

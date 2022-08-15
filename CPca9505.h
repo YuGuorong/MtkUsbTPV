@@ -2,10 +2,11 @@
 
 #include "CFtDevice.h"
 
-
+#define KEY_FUN_I2C_ADDR     0x22
+#define SLAVER_I2C_ADDR_BIT  0x40 
 class CPca9505: public CFtDevice 
 {
-	static const int ID_CHIP_ADDR = 0x20;
+	int ID_CHIP_ADDR /*= 0x20*/;
 	static const int IO_GROUP_MAX = 5;
 	BYTE m_RegOP[IO_GROUP_MAX];  //Output REG cache
 	BYTE m_RegICO[IO_GROUP_MAX]; //Config Reg cache, 0:Output ,1:Input
@@ -21,11 +22,13 @@ class CPca9505: public CFtDevice
 	BOOL ReadReg(REG_TYPE regType);
 	BOOL WriteReg(REG_TYPE regType);
 public:
-	CPca9505(FT_DEVICE_LIST_INFO_NODE* info, int open_idx);
+	CPca9505(FT_DEVICE_LIST_INFO_NODE* info, int open_idx, int chipid= KEY_FUN_I2C_ADDR);
 	~CPca9505();
 	BOOL CheckConfig();
 
 	virtual LRESULT SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync = TRUE);
 	virtual LRESULT UpdateRaw(void);
+
+	virtual void SetAttrib(char * attr, int id);
 };
 

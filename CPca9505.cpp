@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "CPca9505.h"
+
 /*
 FTDI GPIO Layout
 | 31 30 29 28 27 26 25 24 | 23 22 21 20 19 18 17 16 | 15 14 13 12 11 10 09 08 | 07 06 05 04 03 02 01 00 |
@@ -12,7 +13,7 @@ Parameter Raw data layout
 PCA9505 Layout
 | 31 30 29 28 27 26 25 24 | 23 22 21 20 19 18 17 16 | 15 14 13 12 11 10 09 08 | 07 06 05 04 03 02 01 00 |
   -  - |  CON7  |  CON6   | -  - |  CON5  |  CON4   | -  - |  CON3  |   CON2  | -  - |  CON1  |  CON0   |
-
+  
 */
 
 
@@ -73,9 +74,10 @@ BOOL CPca9505::WriteReg(REG_TYPE regType)
 	return FALSE;
 }
 
-CPca9505::CPca9505(FT_DEVICE_LIST_INFO_NODE* info, int open_idx)
+CPca9505::CPca9505(FT_DEVICE_LIST_INFO_NODE* info, int open_idx, int chipid)
 	:CFtDevice(info, open_idx)
 {
+	ID_CHIP_ADDR = chipid;
 	memset(m_RegICO, 0xFF, sizeof(m_RegOP));
 	memset(m_RegICO, 0x00, sizeof(m_RegICO));
 }
@@ -199,4 +201,10 @@ LRESULT CPca9505::UpdateRaw(void)
 	}
 	logInfo(L"Update raw cache :[%S]", str);
 	return bSucceed ? S_OK : ERROR_READ_FAULT;
+}
+
+void CPca9505::SetAttribute(char* attr, int id) {
+	if( strcmp(attr, "master") == 0 ){
+		ID_CHIP_ADDR = (id == 1) ? (KEY_FUN_I2C_ADDR| SLAVER_I2C_ADDR_BIT) : KEY_FUN_I2C_ADDR;
+	}
 }

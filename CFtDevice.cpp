@@ -653,3 +653,6 @@ LRESULT CFtDevice::Close(void)
 	return LRESULT(0);
 }
 
+void CFtDevice::SetAttribute(char* attr, int id) {
+
+}
