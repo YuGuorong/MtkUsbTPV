@@ -32,4 +32,6 @@ public:
 	LRESULT Display(int con, IO_VAL* io_val, int* items);
 
 	LRESULT SelMaster(int id);
+	LRESULT RunScript(char* script);
+	LRESULT Run(void * chip_op);
 };

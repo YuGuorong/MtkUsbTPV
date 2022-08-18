@@ -580,6 +580,7 @@ LRESULT CFtDevice::Open()
 			ftStatus = FT_GetComPortNumber(m_ftHandle, &m_ComPort);
 			logInfo(L"Device COM port is: %d", m_ComPort);
 		}
+		logTrace(L"Set FDTI to serial mode....");
 		UCHAR bInMpsseMode = isMpsseMode();
 		if ( bInMpsseMode != 0 ) {
 			ftStatus |= FT_SetUSBParameters(m_ftHandle, 65536, 65535);			// Set USB request transfer sizes
@@ -655,4 +656,13 @@ LRESULT CFtDevice::Close(void)
 
 void CFtDevice::SetAttribute(char* attr, int id) {
 
+}
+
+void CFtDevice::RunScript(char* script)
+{
+}
+
+LRESULT CFtDevice::Run(void* chip_op)
+{
+	return LRESULT(0);
 }

@@ -2,6 +2,7 @@
 #include "CPca9505.h"
 
 /*
+PCA9505 CONFIG 0:Output/1:Input
 FTDI GPIO Layout
 | 31 30 29 28 27 26 25 24 | 23 22 21 20 19 18 17 16 | 15 14 13 12 11 10 09 08 | 07 06 05 04 03 02 01 00 |
 |   CON7  |  CON6  |  CON5    |   CON4 |   GPIO-H   |   CON3  |  CON2  |   CON1   | CON0   |   GPIO-L   |
@@ -16,7 +17,7 @@ PCA9505 Layout
   
 */
 
-
+unsigned long atox(const void* ptr_str, int charwidth);
 
 #define DEFER_1(x, y) x##y
 #define DEFER_2(x, y) DEFER_1(x, y)
@@ -78,7 +79,7 @@ CPca9505::CPca9505(FT_DEVICE_LIST_INFO_NODE* info, int open_idx, int chipid)
 	:CFtDevice(info, open_idx)
 {
 	ID_CHIP_ADDR = chipid;
-	memset(m_RegICO, 0xFF, sizeof(m_RegOP));
+	memset(m_RegOP, 0, sizeof(m_RegOP));
 	memset(m_RegICO, 0x00, sizeof(m_RegICO));
 }
 
@@ -95,13 +96,13 @@ BOOL CPca9505::CheckConfig()
 	BOOL bSucceed = ReadReg(REG_CONFIG);
 	if (bSucceed) {
 		bSucceed = ReadReg(REG_CONFIG);
-		for (int i = 0; i < IO_GROUP_MAX; i++) {
-			if ((m_RegICO[i]) != 0x00) {
-				memset(m_RegICO, 0, IO_GROUP_MAX);
-				bSucceed =  I2C_Write(ID_CHIP_ADDR, (REG_AUTO_INC | REG_CFG_ADDR), m_RegICO, IO_GROUP_MAX);
-				return ReadReg(REG_CONFIG);
-			}
-		}
+		//for (int i = 0; i < IO_GROUP_MAX; i++) {
+		//	if ((m_RegICO[i]) != 0x00) {
+		//		memset(m_RegICO, 0, IO_GROUP_MAX);
+		//		bSucceed =  I2C_Write(ID_CHIP_ADDR, (REG_AUTO_INC | REG_CFG_ADDR), m_RegICO, IO_GROUP_MAX);
+		//		return ReadReg(REG_CONFIG);
+		//	}
+		//}
 	}
 	else {
 		Close();
@@ -207,4 +208,178 @@ void CPca9505::SetAttribute(char* attr, int id) {
 	if( strcmp(attr, "master") == 0 ){
 		ID_CHIP_ADDR = (id == 1) ? (KEY_FUN_I2C_ADDR| SLAVER_I2C_ADDR_BIT) : KEY_FUN_I2C_ADDR;
 	}
+}
+
+#pragma warning(disable: 4996)   
+
+#include "json/json.h"
+typedef Json::Writer JsonWriter;
+typedef Json::Reader JsonReader;
+typedef Json::Value  JsonValue;
+
+
+
+DWORD fsize(FILE* fp) {
+	DWORD fpos = ftell(fp);
+	fseek(fp, 0, SEEK_END);
+	DWORD fsz = ftell(fp);
+	fseek(fp, fpos, SEEK_SET);
+	return fsz;
+}
+int getIntValue(JsonValue& jval) {
+	if (jval.isNumeric()) return jval.asInt();
+	if (jval.isString()) {
+		const char* str = jval.asCString();
+		str += strspn(str, " ");
+		int hex = strspn(str, "0xX");
+		if (hex != 0) {
+			return atox(str, 1);
+		}
+		else {
+			return atoi(str);
+		}
+	}
+	return -1;
+}
+
+int getKeyValue(const char * skey, JsonValue& jnode, std::vector<BYTE> &list) {
+	if (jnode.isMember(skey)) {
+		JsonValue jval = jnode[skey];
+		if (jval.isArray()) {
+			for (int i = 0; i < jval.size(); i++) {
+				list.push_back(getIntValue(jval[i]));
+			}
+		}
+		else {
+			list.push_back(getIntValue(jval));
+		}
+		return list.size();
+	}
+	return -1;
+}
+
+
+
+void load_reg_table(JsonValue & jreg, REG_TABLE_LIST_T& reg_list) {
+	REG_TABLE_T reg_table;
+	std::vector<BYTE> reg_addr ;
+	if (getKeyValue("addr", jreg, reg_addr) < 0 ) return;
+	JsonValue jval ;
+	std::vector<int> regval;
+	const char* keywords[] = { "value" , "setbit", "clrbit", "read" };
+	for (int i = 0; i < sizeof(keywords) / sizeof(const char*); i++) {
+		reg_table.val.clear();
+		if (getKeyValue(keywords[i], jreg, reg_table.val) >= 0) {
+			reg_table.op = i;
+			reg_table.addr = reg_addr[0];
+			reg_list.push_back(reg_table);
+		}
+	}
+}
+
+void logList(const char * info, std::vector<BYTE>& vlist) {
+	stringstream sinfo;
+	sinfo << info<< ":[";
+	for (auto v: vlist) {
+		sinfo << hex << (int)v << ",";
+	}
+	sinfo << "]";
+	char log[128];
+	sinfo >> log;
+	USES_CONVERSION;
+	logInfo(A2W(log));
+}
+
+
+void json_proc_dev ( JsonValue & jdev , CHIP_TAB_LIST_T& chiplist) {
+	CHIP_TABLE_T chip;
+	if (getKeyValue("addr", jdev, chip.chipid) < 0) return;
+	if (!jdev.isMember("register")) return;
+	JsonValue jregs = jdev["register"];
+	
+	if (jregs.isArray()) {
+		for (int i = 0; i < jregs.size(); i++) {
+			load_reg_table(jregs[i], chip.reg_table);
+		}
+	}
+	else {
+		load_reg_table(jregs, chip.reg_table);
+	}
+	chiplist.push_back(chip);
+
+}
+
+void load_script(char* script, CHIP_TAB_LIST_T& chiplist) {
+	FILE* fp = fopen(script, "rb");
+	if (fp == NULL) return;
+	DWORD flen = fsize(fp);
+	DWORD dBufferLength_string = 512;
+	std::vector<char> stringBuff(flen);
+	fread(&stringBuff[0], 1, flen, fp);
+	fclose(fp);
+	//retCode = GetHttpData_ServerInfo(myheader, HTTP_QUERY_DATE, &stringBuff[0], dBufferLength_string, proxy);
+	std::string msg(stringBuff.begin(), stringBuff.end());//»òmyStr.assign(stringBuff.begin(), stringBuff.end());
+
+	JsonReader freader;
+	JsonValue rootr;
+	freader.parse(msg, rootr);
+	JsonValue devs = rootr["pca9505"];
+
+	if (devs.isArray()) {
+		for (int i = 0; i < devs.size(); i++) {
+			json_proc_dev(devs[i], chiplist);
+		}
+	}
+	else {
+		json_proc_dev(devs, chiplist);
+	}
+}
+
+void CPca9505::RunScript(char* script)
+{
+	load_script(script, m_chip_list);
+	Run(&m_chip_list);
+
+}
+
+LRESULT CPca9505::Run(void* p_op)
+{
+	CHIP_TAB_LIST_T* chip_op = (CHIP_TAB_LIST_T*)p_op;
+	for (auto chip : *chip_op) {
+		for (auto chipid : chip.chipid)
+		{
+			chipid |= 0x20;
+			logInfo(L"ChipID %X:", chipid);
+			for (auto& it : chip.reg_table) {
+				const char* tips[] = { "Reg(write):","Reg(setbit):","Reg(clrbit):","Reg(read):" };
+				logInfo(L"   %S [%X]=>", tips[it.op], it.addr);
+				BYTE regAddr = it.addr | REG_AUTO_INC;
+				logList("    Data:", it.val);
+				BYTE cache[IO_GROUP_MAX];
+				if (it.op == REG_OP_WRITE) {
+					memcpy(cache, &it.val[0], it.val.size());
+				}
+				else {
+					int rlen = (it.op == REG_OP_READ) ? IO_GROUP_MAX : it.val.size();
+					if (!I2C_Read(chipid | 0x20, regAddr, cache, rlen)) break;
+					for (int i = 0; i < rlen; i++) {
+						if (it.op == REG_OP_SETBIT)
+							cache[i] |= it.val[i];
+						else if (it.op == REG_OP_CLRBIT)
+							cache[i] &= it.val[i];
+						else
+							cout << ((i == 0) ? "0x" : ",0x") << hex << (int)cache[i];
+					}
+					if (it.op == REG_OP_READ) {
+						cout << endl;
+						continue;
+					}
+				}
+
+				if (!I2C_Write(chipid | 0x20, regAddr, cache, it.val.size()))
+					break;
+			}
+		}
+	}
+	return 0;
 }

@@ -43,6 +43,8 @@ protected:
 public:
 	int isMpsseMode();
 	virtual void SetAttribute(char* attr, int id);
+	virtual void RunScript(char* script);
+	virtual LRESULT Run(void* chip_op);
 };
 
 

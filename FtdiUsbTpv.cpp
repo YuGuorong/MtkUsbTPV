@@ -13,7 +13,7 @@
 #define new DEBUG_NEW
 #endif
 
-#define DEBUG_ARG 0
+#define DEBUG_ARG 1
 // 唯一的应用程序对象
 CWinApp theApp;
 using namespace std;
@@ -32,10 +32,10 @@ using namespace std;
 #define CMD_VERSION    'v'
 #define CMD_HELP       'h'
 #define CMD_SEL_MASTER 'm'
-#define CMD_SWITCH     'w'
+#define CMD_RUN_SCRIPT 'R'
 
 
-const char* optstring = "vdluhg:i:c:o:k:p:s:r:m:";
+const char* optstring = "vdluhg:i:c:o:k:p:s:r:m:R:";
 //required_argument
 const struct option long_options[] = {
     {"index",   optional_argument, NULL, 'i'},
@@ -60,12 +60,14 @@ const struct option long_options[] = {
     {"gpio6",   required_argument, NULL, '6'},
     {"gpio7",   required_argument, NULL, '7'},
     {"master",  required_argument, NULL, 'm'},
+    {"run",     required_argument, NULL, 'R'},
     {0, 0, 0, 0}
 };
 
 char* testarg[] =
 {
     "-h",
+    "-R", "test.json",
     "-m", "1",
     "-v",
     "-l",
@@ -187,51 +189,13 @@ BOOL ChkIdx(int index) {
 }
 #define CHKIDX() ChkIdx(cur_req.index )
 
-int bard_cfg = 0;
-void checkenv(int argc, char** argv) {
-    int opt;
-    int digit_optind = 0;
-    int option_index = 0;
-    int boardindex = -1;
-    int master = 0;
-    optind = 0;
-    if (argc <= 1) return;
-    char** narg = new char* [argc + 1];
-    for (int i = 0; i < argc; i++) {
-        narg[i] = new char[strlen(argv[i])+ 1];
-        strcpy(narg[i], argv[i]);
-    }
 
-    while ((opt = getopt_long(argc, argv, optstring, long_options, &option_index)) != -1)
-    {
-        int argval = (optarg == NULL) ? 0 : atoi(optarg);
-
-        switch (opt) {
-        case CMD_SWITCH:
-            bard_cfg = argval;
-            logInfo(L"board switch:%X", argval);
-            break;
-        
-        }
-    }
-
-    for (int i = 0; i < argc; i++) delete[] narg[i];
-    delete[] narg;
-
-}
 
 int server_entry(int argc, char** argv)
 {
     int nRetCode = 0;
     LRESULT err;
     InitLog();
-    optind = 0;
-    checkenv(argc, argv);
-    LPWSTR szargs = GetCommandLineW();
-    logTrace(L"Program start with arg(%d): [%s]", argc, szargs);
-
-
-
     CFtdiDriver  drvFdti;
     drvFdti.Scan(FALSE);
     drvFdti.MountDevices();
@@ -254,7 +218,7 @@ int server_entry(int argc, char** argv)
         //showHelp(argv[0]);
         return 1;
     }
-
+    optind = 0;
     while ((opt = getopt_long(argc, argv, optstring, long_options, &option_index)) != -1)
     {
         int argval =  (optarg == NULL )? 0 : atoi(optarg);
@@ -308,6 +272,13 @@ int server_entry(int argc, char** argv)
                 master = argval;
                 if (pboard) pboard->SelMaster(master);
             }
+            break;
+        case CMD_RUN_SCRIPT:
+            if (pboard == NULL) {
+                cur_req.index =  boardindex = 0;
+                pboard = drvFdti.FindBoard(0, boardindex, &err);
+            }
+            if( pboard ) pboard->RunScript(optarg);
             break;
         case '?':
             break;
@@ -367,8 +338,207 @@ LONG ApplicationCrashHandler(EXCEPTION_POINTERS* pException)
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
+CString GetExeName(HMODULE hModule) {
+    if(hModule == NULL )
+        hModule = ::GetModuleHandle(nullptr);
+
+    CString sfname;
+    TCHAR* psn = sfname.GetBuffer(MAX_PATH);
+    DWORD len = ::GetModuleFileName(hModule, psn, MAX_PATH);
+    psn[len] = 0;
+    sfname.ReleaseBuffer();
+    sfname.Delete(0, sfname.ReverseFind('\\') + 1);
+    
+    return sfname;
+}
+
+int getParamVal(const char * str) {
+    str += strspn(str, " ");
+    int hex = strspn(str, "0xX");
+    if (hex != 0) {
+        return atox(str, 1);
+    }
+    else {
+        return atoi(str);
+    }
+    return -1;
+}
+
+
+void show_i2c_tools_help(LPCTSTR exename) {
+    logError(L"Usage of tool:\n");
+    printf("%S {option} {chip_addr} {reg_addr: reg_value...t} ...\n", exename);
+    printf("option: [w/write/r/read/s/setbit/c/clrbit]\n");
+    printf("        w/write:  Direct write value to spec chip 9505 registers\n");
+    printf("        r/read:   Direct read the spec chip 9505 registers\n");
+    printf("        s/setbit: Read spec 9505 addr register value and set+write-back one/multi bits\n");
+    printf("        c/clrbit: Read spec 9505 addr register value and clear+write-back one/multi bits\n");
+    printf("chip_addr: one or more chip i2c address, separated by commas\n");
+    printf("reg_addr: The start address of register\n");
+    printf("reg_value:The list of register value to be write, separated by commas\n");
+    printf("\n");
+}
+
+#include "CPca9505.h"
+CHIP_TAB_LIST_T chip_op_arg;
+const char* cmdlist[] = {  "write",  "setbit",  "clrbit", "read" };
+int get_cmd(const char* str) {
+    for (int i = 0; i < sizeof(cmdlist) / sizeof(const char*); i++) {
+        if (str[0] == cmdlist[i][0]) {
+            if (str[1] == 0 || str[1] == 0 || strcmp(str, cmdlist[i]) == 0) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+int getCmd(int pos, int &opmod, int argc, char* argv[]) {
+    while (pos < argc) {
+        int cmd = get_cmd(argv[pos++]);
+        if (cmd != -1) {
+            opmod = cmd;
+            return pos;
+        }
+    }
+    return -1;
+}
+
+int getListValue(int &pos, std::vector<BYTE>& list, int argc, char* argv[]) {
+    if (pos >= argc) return -1;
+    int offset = (argv[pos][0] == '[') ? 1 : 0;
+    BOOL gonext = TRUE;
+    int count = 0;
+    while (pos < argc) {
+        int chipid = getParamVal(&argv[pos][offset]);
+        if (chipid != 0) {
+            gonext = FALSE;
+            list.push_back((BYTE)chipid);
+            count++;
+        }
+        if (strchr(&argv[pos][offset], ']') != 0) {
+            pos++;
+            return count;
+        }
+        char* pn = strchr(&argv[pos][offset], ',');
+        if (pn ) {
+            offset = pn - argv[pos] + 1;
+            gonext = TRUE;
+        }
+        else {
+            if (++pos >= argc) return count;
+            offset = 0;
+            if (!gonext) {
+                pn = strchr(argv[pos], ',');
+                if (pn == nullptr) return count;
+                offset = pn - argv[pos] + 1;
+                gonext = TRUE;
+            }
+        }
+    }
+    return -1;
+}
+
+int parseargs(CHIP_TAB_LIST_T &chiplist, int argc, char* argv[]) {
+    int optpos = 1;
+    while (optpos < argc) { 
+        CHIP_TABLE_T chip;
+        int i2caddr = 0;
+        int opmod = REG_OP_READ;
+        int regaddr = -1;
+        //char* p = strspn(argv[optpos], " ");
+        //cmd
+        if (getCmd(optpos, opmod, argc, argv) < 0) return optpos;
+        //chip addr,
+        if (optpos >= argc || getListValue(optpos, chip.chipid, argc, argv) <= 0)
+            return optpos;
+        //reg addr,
+        if (optpos >= argc || (regaddr = getParamVal(argv[optpos++])) == -1) return optpos;
+        //reg value,
+        REG_TABLE_T regtbl;
+        if (optpos >= argc || getListValue(optpos, regtbl.val, argc, argv) <= 0)
+            return optpos;
+
+        regtbl.addr = regaddr;
+        regtbl.op = opmod;
+        chip.reg_table.push_back(regtbl);
+        chiplist.push_back(chip);
+    }
+    return 0;
+}
+
+int load_sub_string(char* buf, const char* ps, const char *key) {
+    const char* ptr = strchr(ps, key[0]);
+    char strimchr[] = { ' ',key[0],key[1],0 };
+    if (ptr == NULL) return -1;
+    ptr = ptr + strspn(ptr, strimchr);
+    const char * pe = strchr(ptr, key[1]);
+    if (pe == nullptr) return -1;
+    int len = pe - ptr ;
+
+    memcpy(buf, ptr , len);
+    buf[len] = 0;
+    return pe - ps + 1;
+}
+
+int load_list(std::vector<BYTE>&list, char* str) {
+    for (int count = 0; str && *str; count++) {
+        str += strspn(str, " ,[");
+        int iv = getParamVal(str);
+        if (iv == -1) return count;
+        str = strchr(str, ',');
+        list.push_back((BYTE)iv);
+    }
+    return 0;
+}
+
+char * move_next(char*& ptr, char* &pnext) {
+    ptr = pnext + 1 + strspn(pnext + 1, " ,");
+    pnext = strchr(ptr, ((ptr[0] == '[') ? ']' : ','));
+    if (pnext == nullptr) return ptr;
+    *pnext = 0;
+    return ptr ;
+}
+////test.exe {w,0x26,0,[1,3,2]}, {s,0x3}
+int parseOneLine(CHIP_TAB_LIST_T& chiplist, const char* cmdline) {
+    char str[256];
+    int offset = 0;
+    int len = 0;
+
+    while ((len = load_sub_string(str, &cmdline[offset], "{}") ) > 0 ) {
+        offset += len;
+
+        CHIP_TABLE_T chip;
+        REG_TABLE_T reg;
+        char* ptr = str;
+        char* pnext = strchr(ptr, ',') ;
+        *pnext = '\0';
+        int icmd = get_cmd(ptr);
+        if (icmd == -1) return -1;
+
+        load_list(chip.chipid, move_next(ptr, pnext));
+
+        if (pnext == nullptr) return -1;
+        move_next(ptr, pnext);
+        reg.addr = getParamVal(ptr);
+
+        if (icmd != REG_OP_READ) {
+            if (pnext == nullptr) return -1;
+            load_list(reg.val, move_next(ptr, pnext));
+        }
+
+        reg.op = icmd; 
+        chip.reg_table.push_back(reg);
+        chiplist.push_back(chip);
+    }
+    return 0;
+}
+
 int main(int argc, char* argv[])
 {
+   //test.exe {w,0x26,0,[1,3,2]}, {s,0x3}
+
+    char* testa[] = { "test", "w","0x26", "0x18", "[0x11,", "15", ",","7,", ",","3]"};
+ 
     SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)ApplicationCrashHandler);
 
     HMODULE hModule = ::GetModuleHandle(nullptr);
@@ -390,23 +560,62 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-
-   
-    //::AfxInitRichEdit2();
-    //_CrtSetBreakAlloc(132); //383为上面内存泄漏的块号.
+    //tools write/read/setbit/clrbit chipaddr  regaddr [values]
+    CString sfname = GetExeName(hModule);
+    if (sfname.CompareNoCase(L"FtdiUsbTpv.exe") == 0) {
+        //if (sfname.CompareNoCase(L"Ftdi_I2c_Tool.exe") == 0) {
+        CHIP_TAB_LIST_T chiplist;
+        const char* p = ::GetCommandLineA();
 #if DEBUG_ARG
-    argc = sizeof(testarg) / sizeof(char*);
-    int ret =  server_entry(argc, testarg);
+        argc = sizeof(testa) / sizeof(char*);
+        argv = testa;
+        p = "\\mtk_USBTPV\\USBTPV\\MtkUsbTPV\\Debug\\FtdiUsbTpv.exe "
+            "{w,[0x0,0x1],0x18,[0,0,0,0,0]},"
+            "{w,[0x0,0x1],0x8,[0x20, 0x00, 0, 0, 0]} "
+            "{s,0x0,0x8,[0x40, 0x80, 0x14, 0x10, 0x10]}"
+            "{c,0x0,0x8,[0x20, 0x80, 0x10, 0x00, 0x10]}"
+            "{r,0x0,0x8}";
+#endif
+        if (strchr(p, '{') != nullptr) 
+            parseOneLine(chiplist, p);
+        else {
+            int errpos = 0;
+            if (argc < 3 || (errpos = parseargs(chiplist, argc, argv)) != 0) {
+                if (errpos) printf("Parse command paramter fail at %dth parameter\n", errpos);
+                show_i2c_tools_help(sfname);
+                return -1;
+            }
+        }
+
+        LRESULT err;
+        InitLog();
+        CFtdiDriver  drvFdti;
+        drvFdti.Scan(FALSE);
+        drvFdti.MountDevices();
+        CTpvBoard* pboard = NULL;
+
+        pboard = drvFdti.FindBoard(0, 0, &err);
+        if (pboard) return pboard->Run(&chiplist);
+        return -1;
+    }
+    else {
+
+        //::AfxInitRichEdit2();
+        //_CrtSetBreakAlloc(132); //383为上面内存泄漏的块号.
+#if DEBUG_ARG
+        argc = sizeof(testarg) / sizeof(char*);
+        int ret = server_entry(argc, testarg);
 #else
-    int ret = server_entry(argc, argv);
+        int ret = server_entry(argc, argv);
 #endif
 
-    _CrtMemCheckpoint(&s2);
+        _CrtMemCheckpoint(&s2);
 
-    if (_CrtMemDifference(&s3, &s1, &s2)) {
-        _CrtMemDumpStatistics(&s3);
-        _CrtDumpMemoryLeaks();
+        if (_CrtMemDifference(&s3, &s1, &s2)) {
+            _CrtMemDumpStatistics(&s3);
+            _CrtDumpMemoryLeaks();
+        }
+        return ret;
     }
-
-    return ret;
+    
 }

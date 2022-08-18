@@ -143,7 +143,24 @@ LRESULT CTpvBoard::Display(int con, IO_VAL* io_val, int* items)
 
 LRESULT CTpvBoard::SelMaster(int id) {
 	for (int i = 0; i < m_deviceNum; i++) {
-		(m_Devices[i])->SetAttrib("master", id);
+		(m_Devices[i])->SetAttribute("master", id);
+	}
+	return S_OK;
+}
+
+
+LRESULT CTpvBoard::RunScript(char* script)
+{
+	for (int i = 0; i < m_deviceNum; i++) {
+		(m_Devices[i])->RunScript(script);
+	}
+	return S_OK;
+}
+
+LRESULT CTpvBoard::Run(void * chip_op)
+{
+	for (int i = 0; i < m_deviceNum; i++) {
+		(m_Devices[i])->Run(chip_op);
 	}
 	return S_OK;
 }
