@@ -56,6 +56,8 @@ public:
 	virtual LRESULT Run(void* chip_op);
 
 	CHIP_TAB_LIST_T m_chip_list;
+public:
+	static void load_script(char* script, CHIP_TAB_LIST_T& chiplist);
 
 };
 

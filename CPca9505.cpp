@@ -309,7 +309,7 @@ void json_proc_dev ( JsonValue & jdev , CHIP_TAB_LIST_T& chiplist) {
 
 }
 
-void load_script(char* script, CHIP_TAB_LIST_T& chiplist) {
+void CPca9505::load_script(char* script, CHIP_TAB_LIST_T& chiplist) {
 	FILE* fp = fopen(script, "rb");
 	if (fp == NULL) return;
 	DWORD flen = fsize(fp);

@@ -498,11 +498,24 @@ char * move_next(char*& ptr, char* &pnext) {
     *pnext = 0;
     return ptr ;
 }
+
+void load_json(CHIP_TAB_LIST_T& chiplist, const char* cmdline) {
+    const char* pjson = strstr(cmdline, "-i");
+    if (pjson) {
+        pjson += strspn(pjson, " -i");
+        const char* pe = pjson + strcspn(pjson, " ,");
+        char jname[256];
+        memcpy(jname, pjson, pe - pjson);
+        jname[pe - pjson] = 0;
+        CPca9505::load_script(jname, chiplist);
+    }
+}
 ////test.exe {w,0x26,0,[1,3,2]}, {s,0x3}
 int parseOneLine(CHIP_TAB_LIST_T& chiplist, const char* cmdline) {
     char str[256];
     int offset = 0;
     int len = 0;
+    load_json(chiplist, cmdline);
 
     while ((len = load_sub_string(str, &cmdline[offset], "{}") ) > 0 ) {
         offset += len;
@@ -569,7 +582,7 @@ int main(int argc, char* argv[])
 #if DEBUG_ARG
         argc = sizeof(testa) / sizeof(char*);
         argv = testa;
-        p = "\\mtk_USBTPV\\USBTPV\\MtkUsbTPV\\Debug\\FtdiUsbTpv.exe "
+        p = "\\mtk_USBTPV\\USBTPV\\MtkUsbTPV\\Debug\\FtdiUsbTpv.exe  -i test.json "
             "{w,[0x0,0x1],0x18,[0,0,0,0,0]},"
             "{w,[0x0,0x1],0x8,[0x20, 0x00, 0, 0, 0]} "
             "{s,0x0,0x8,[0x40, 0x80, 0x14, 0x10, 0x10]}"
