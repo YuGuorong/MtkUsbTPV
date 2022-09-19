@@ -105,6 +105,9 @@
     <ClInclude Include="CTpvBoard.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="CMainDlg.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FtdiUsbTpv.cpp">
@@ -170,6 +173,9 @@
     <ClCompile Include="jsoncpp\src\json_writer.cpp">
       <Filter>Extern\jsoncpp</Filter>
     </ClCompile>
+    <ClCompile Include="CMainDlg.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="FtdiUsbTpv.rc">
@@ -195,6 +201,12 @@
       <Filter>资源文件</Filter>
     </Image>
     <Image Include="res\SwOn.png">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="res\PCadPcb_No.ico">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="res\PCadPcb.ico">
       <Filter>资源文件</Filter>
     </Image>
   </ItemGroup>

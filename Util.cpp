@@ -41,8 +41,10 @@ BOOL CPMutex::UnLock()
 }
 
 static DWORD m_sysError = 0;
-void SetFaultError(DWORD err) {
+DWORD SetFaultError(DWORD err) {
+	DWORD orig = m_sysError;
 	m_sysError = err;
+	return orig;
 }
 
 DWORD GetFaultError() {
@@ -59,7 +61,7 @@ void GetCurPath(CString &strPath)
 	strPath = strPath.Left(pos + 1);
 }
 
-BOOL g_dbgLogConsole = FALSE;
+BOOL g_dbgLogConsole = TRUE;
 void AppEnvInit()
 {
 	GetCurPath(strCurPath);
@@ -370,6 +372,51 @@ CString GetReadableSize(DWORD32 size)
 	return stri;
 }
 
+#pragma comment(lib,"Version.lib") 
+CString m_strVersion;
+CString GetSWVersion(WORD *ProdVersion)
+{
+	if (!m_strVersion.IsEmpty()) return m_strVersion;
+	TCHAR szFullPath[MAX_PATH];
+	DWORD dwVerInfoSize = 0;
+	DWORD dwVerHnd;
+	VS_FIXEDFILEINFO* pFileInfo;
+
+	::GetModuleFileName(NULL, szFullPath, sizeof(szFullPath));
+	dwVerInfoSize = ::GetFileVersionInfoSize(szFullPath, &dwVerHnd);
+	if (dwVerInfoSize)
+	{
+		// If we were able to get the information, process it:
+		HANDLE  hMem;
+		LPVOID  lpvMem;
+		unsigned int uInfoSize = 0;
+
+		hMem = GlobalAlloc(GMEM_MOVEABLE, dwVerInfoSize);
+		lpvMem = GlobalLock(hMem);
+		GetFileVersionInfo(szFullPath, dwVerHnd, dwVerInfoSize, lpvMem);
+
+		::VerQueryValue(lpvMem, (LPTSTR)_T("\\"), (void**)&pFileInfo, &uInfoSize);
+
+		WORD temp[4];
+		WORD* m_nProdVersion = ProdVersion == nullptr ? temp : ProdVersion;
+		// Product version from the FILEVERSION of the version info resource 
+		m_nProdVersion[0] = HIWORD(pFileInfo->dwProductVersionMS);
+		m_nProdVersion[1] = LOWORD(pFileInfo->dwProductVersionMS);
+		m_nProdVersion[2] = HIWORD(pFileInfo->dwProductVersionLS);
+		m_nProdVersion[3] = LOWORD(pFileInfo->dwProductVersionLS);
+
+		
+		//strVersion.Format(_T("The file's version : %d.%d.%d.%d"),m_nProdVersion[0],m_nProdVersion[1],m_nProdVersion[2],m_nProdVersion[3]);
+		m_strVersion.Format(_T("%d.%d.%d.%d"), m_nProdVersion[0], m_nProdVersion[1], m_nProdVersion[2], m_nProdVersion[3]);
+
+		GlobalUnlock(hMem);
+		GlobalFree(hMem);
+
+		//AfxMessageBox(strVersion);
+	}
+	return m_strVersion;
+
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //com.cpp  end
@@ -734,3 +781,92 @@ int test_reg(int argc, _TCHAR* argv[])
 	getchar();
 	return 0;
 }
+
+
+void HideConsole()
+{
+	::ShowWindow(::GetConsoleWindow(), SW_HIDE);
+}
+
+void ShowConsole()
+{
+	::ShowWindow(::GetConsoleWindow(), SW_SHOW);
+}
+
+bool IsConsoleVisible()
+{
+	return (::IsWindowVisible(::GetConsoleWindow()) != FALSE);
+}
+
+static HANDLE hPipe = 0, m_hStopEvent = 0, m_hPiEvent;
+OVERLAPPED  ovpPipe;
+ 
+char printbuf[2048];
+
+void __CRTDECL threadProc(void* param) {
+	m_hStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	OVERLAPPED  op;
+	HANDLE      handleArray[2];
+	BOOL        bStop = FALSE;
+	memset(&op, 0, sizeof(op));
+	handleArray[0] = op.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	handleArray[1] = m_hStopEvent;
+
+	if (WaitForSingleObject(m_hPiEvent, NMPWAIT_NOWAIT) != WAIT_OBJECT_0) {
+		ConnectNamedPipe(hPipe, &ovpPipe);
+		if (GetLastError() != ERROR_IO_PENDING) {
+			printf("pipe not ready\n");
+			return ;
+		}
+	}
+}
+
+
+int __CRTDECL piPrint(const char* fmt, ...) {
+	if (hPipe == 0) {
+		hPipe = CreateNamedPipe(PRINT_PIPE_NAME, PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+			PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT
+			, PIPE_UNLIMITED_INSTANCES, 0, 0, NMPWAIT_WAIT_FOREVER, 0);
+		if (hPipe == INVALID_HANDLE_VALUE) hPipe = 0;
+		if (hPipe == 0) return 0;
+		memset(&ovpPipe, 0, sizeof(ovpPipe));
+		m_hPiEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+		ovpPipe.hEvent = m_hPiEvent;
+		//_beginthread(threadProc, 0, hPipe);
+	}
+	//printf("%s/%d\n", __func__, __LINE__);
+	if (WaitForSingleObject(m_hPiEvent, NMPWAIT_NOWAIT) != WAIT_OBJECT_0) {
+		//printf("%s/%d\n", __func__, __LINE__);
+		ConnectNamedPipe(hPipe, &ovpPipe);
+		if (GetLastError() == ERROR_IO_PENDING) {
+			printf("pipe pending\n");
+			return 0;
+		}
+	}
+
+	//printf("pipe connect %s/%d\n", __func__, __LINE__);
+	va_list args;
+	va_start(args, fmt);
+	int len = vsprintf_s(printbuf, 2048, fmt, args);//因为%的原因导致了崩溃
+	va_end(args);
+	DWORD wb;	
+	CancelIo(hPipe);
+	if (WriteFile(hPipe, printbuf, len, &wb, NULL) == FALSE) {
+		printf("%s/%d\n", __func__, __LINE__);
+		wprintf(L"Write failed; Error [%d]\n", GetLastError());
+		ResetEvent(m_hPiEvent);
+	}
+	return len;
+}
+
+void __CRTDECL freePiPrint() {
+	if (hPipe) {
+		SetEvent(m_hStopEvent);
+		Sleep(50);
+		DisconnectNamedPipe(hPipe);
+		CloseHandle(hPipe);
+		hPipe = 0;
+		printf("pipe closed\n");
+	}
+}
+

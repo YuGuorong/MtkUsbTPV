@@ -33,18 +33,16 @@ CFtdiDriver::~CFtdiDriver()
 	Save();
 	if (m_pDevInfoList) {
 		free(m_pDevInfoList);
+		m_pDevInfoList = NULL;
 	}
-	map<int, CTpvBoard*>::iterator itor = m_BoardList.begin();
-	while (itor != m_BoardList.end()) {
-		delete itor->second;
-		//m_BoardList.erase(itor);
-		itor++;
-	}
-	m_BoardList.clear();
+	FreeBoardList();
 	//if (m_InstFtdi != NULL) delete m_InstFtdi;
 }
 
 CFtdiDriver* CFtdiDriver::GetDriver() {
+	if (m_InstFtdi == NULL) {
+		m_InstFtdi = new CFtdiDriver();
+	}
 	return m_InstFtdi;
 }
 
@@ -96,11 +94,11 @@ void CFtdiDriver::ShowDevices(void)
 {
 	for (map<int, CTpvBoard*>::iterator it = m_BoardList.begin(); it != m_BoardList.end(); it++) {
 
-		printf("Board index: %d\r\n", it->second->m_index);
-		printf("      %s\r\n", it->second->m_bMounted ? "Mounted" : "Unmount");
-		printf("      ID: %d[%XH] \r\n", it->second->m_BoardID, it->second->m_BoardID);
-		printf("      Port num: %d \r\n", it->second->m_deviceNum);
-		printf("\r\n");
+		FdtiPrint("Board index: %d\r\n", it->second->m_index);
+		FdtiPrint("      %s\r\n", it->second->m_bMounted ? "Mounted" : "Unmount");
+		FdtiPrint("      ID: %d[%XH] \r\n", it->second->m_BoardID, it->second->m_BoardID);
+		FdtiPrint("      Port num: %d \r\n", it->second->m_deviceNum);
+		FdtiPrint("\r\n");
 		
 	}
 	
@@ -110,6 +108,15 @@ LRESULT CFtdiDriver::SyncIO(int mode, IO_OP* op)
 {
 
 	return LRESULT();
+}
+
+void CFtdiDriver::FreeBoardList()
+{
+	for (auto it : m_BoardList) {
+		delete it.second;
+	}
+	m_BoardIdxNum = 0;
+	m_BoardList.clear();
 }
 
 
@@ -123,7 +130,7 @@ int __cdecl comp_dev(void const* p1, void const* p2)
 
 LRESULT CFtdiDriver::MountDevices()
 {
-	m_BoardList.clear();
+	FreeBoardList();
 
 	INT lastLocId = UNINIT_LCLID;
 	int subChannels = 0;

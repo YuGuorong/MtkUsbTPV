@@ -3,7 +3,7 @@
 #include "CFtDevice.h"
 
 #define KEY_FUN_I2C_ADDR     0x22
-#define SLAVER_I2C_ADDR_BIT  0x40 
+#define SLAVER_I2C_ADDR_BIT  0x04 
 
 enum {
 	REG_OP_WRITE,
@@ -57,7 +57,7 @@ public:
 
 	CHIP_TAB_LIST_T m_chip_list;
 public:
-	static void load_script(char* script, CHIP_TAB_LIST_T& chiplist);
+	static LRESULT load_script(char* script, CHIP_TAB_LIST_T& chiplist);
 
 };
 

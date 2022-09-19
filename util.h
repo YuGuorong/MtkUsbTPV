@@ -62,6 +62,7 @@ void QUnc2Utf(LPCWSTR wstr, CStringA &astr);  //Utf-8 to Wide char, not use too 
 CStringA qUnc2Utf(LPCWSTR wstr);
 CString qUtf2Unc(LPCSTR astr);
 
+CString GetSWVersion(WORD * ProdVersion = NULL);
 
 unsigned long atox(const void* str, int charwidth=1);
 unsigned char atob(const void* ptr_str, int charwidth = 1);
@@ -99,5 +100,13 @@ int DelReg(LPCTSTR path);
 
 extern BOOL g_dbgLogConsole;
 DWORD GetFaultError();
-void SetFaultError(DWORD err);
+DWORD SetFaultError(DWORD err);
+
+bool IsConsoleVisible();
+void ShowConsole();
+void HideConsole();
+
+#define PRINT_PIPE_NAME L"\\\\.\\Pipe\\MediatekPrintPipe"
+int __CRTDECL piPrint(const char* fmt, ...);
+void __CRTDECL freePiPrint();
 #endif

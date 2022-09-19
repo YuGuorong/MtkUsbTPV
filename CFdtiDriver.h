@@ -10,6 +10,8 @@ using namespace std;
 typedef  DWORD  fdtiid;
 
 typedef int (*fLog)(const char* fmt, ...);
+typedef int (*Print_T)(const char* fmt, ...);
+extern Print_T  FdtiPrint;
 
 using namespace std;
 class CFtdiDriver;
@@ -76,6 +78,7 @@ public:
 protected:
 	LRESULT SyncIO(int mode, IO_OP* op);
 	static CFtdiDriver* m_InstFtdi;
+	void FreeBoardList();
 };
 #define IO_RAW    101
 #define CON_RAW   99

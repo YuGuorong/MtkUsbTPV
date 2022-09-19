@@ -27,11 +27,12 @@ public:
 	BOOL isMount() { return m_bMounted; };
 	void Close();
 
-	LRESULT SyncIO(vector<IO_OP>& io_reqQue);
+	LRESULT SyncIO(std::vector<IO_OP>& io_reqQue);
 	LRESULT SyncIO(int con, IO_OP* op, BOOL bSyncHW = 1);
 	LRESULT Display(int con, IO_VAL* io_val, int* items);
 
 	LRESULT SelMaster(int id);
 	LRESULT RunScript(char* script);
 	LRESULT Run(void * chip_op);
+	LRESULT Reset(void);
 };

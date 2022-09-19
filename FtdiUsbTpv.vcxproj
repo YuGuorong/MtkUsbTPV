@@ -29,7 +29,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v141_xp</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseOfMfc>Static</UseOfMfc>
   </PropertyGroup>
@@ -101,6 +101,10 @@
       <AdditionalDependencies>
       </AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -119,6 +123,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -155,6 +163,7 @@
   <ItemGroup>
     <ClInclude Include="CFdtiDriver.h" />
     <ClInclude Include="CFtDevice.h" />
+    <ClInclude Include="CMainDlg.h" />
     <ClInclude Include="CMainFrame.h" />
     <ClInclude Include="CPannel.h" />
     <ClInclude Include="CPca9505.h" />
@@ -184,6 +193,7 @@
   <ItemGroup>
     <ClCompile Include="CFtDevice.cpp" />
     <ClCompile Include="CFtdiDriver.cpp" />
+    <ClCompile Include="CMainDlg.cpp" />
     <ClCompile Include="CMainFrame.cpp" />
     <ClCompile Include="CPannel.cpp" />
     <ClCompile Include="CPca9505.cpp" />
@@ -226,6 +236,8 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\MtkUsbTPV.ico" />
+    <Image Include="res\PCadPcb.ico" />
+    <Image Include="res\PCadPcb_No.ico" />
     <Image Include="res\SwichOff.png" />
     <Image Include="res\SwichOn.png" />
     <Image Include="res\SwOff.png" />

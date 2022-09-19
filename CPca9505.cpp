@@ -65,7 +65,7 @@ BOOL CPca9505::WriteReg(REG_TYPE regType)
 			str += shex;
 			c = ',';
 		}
-		logInfo(L"Write PCA9505 :[%S]", str);
+		logInfo(L"Write PCA9505[%X] :[%S]", ID_CHIP_ADDR, str);
 	}
 
 	if (I2C_Write(ID_CHIP_ADDR, regAddr, pcache, IO_GROUP_MAX))
@@ -133,34 +133,35 @@ LRESULT CPca9505::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync)
 		else if (con == IO_CON_GPIO) {
 			
 			if (ioval->fmt == GPIO_RAW ) {
-				m_RegOP[4] = ioval->v.gpio.val;
+				m_RegOP[3] = ioval->v.gpio.val;
 			}
 			else {
-				m_RegOP[4] &= ~(1 << ioval->v.gpio.bit);
-				if(ioval->v.gpio.val )	m_RegOP[4] |= (1 << ioval->v.gpio.bit);
+				m_RegOP[3] &= ~(1 << ioval->v.gpio.bit);
+				if(ioval->v.gpio.val )	m_RegOP[3] |= (1 << ioval->v.gpio.bit);
 			}
 		}
 		else {
 			char* pin = ioval->v.pin;
-			int gpiobase = (con % 2) * IO_MAX_KEY;
-			BYTE* pcache = &m_RegOP[regbase];
+			int gpiobase = (con  * IO_MAX_KEY);
+			DWORD reg ;
+			memcpy(&reg, &m_RegOP, 4);
 			if (ioval->fmt == CON_RAW) {
-				BYTE raw = ioval->v.raw;
-				for (int i = 0; i < IO_MAX_KEY; i++) {
-					pin[i] = raw  & (1 << i);
-				}
+				reg &= ~(0x7 << con);
+				reg |= ((DWORD)pin[2] << 2 | (DWORD)pin[1] << 1 | (DWORD)pin[0]) << con;
 				ioval->fmt = CON_CTL;
 			}
 
 			for (int i = 0; i < IO_MAX_KEY; i++) {
-				int gpionum = gpiobase + i;
 				if (pin[i] >= 0) { //the pin value 0 means donot change it.keep it stay its state.
-					*pcache &= ~(1 << gpionum);
 					if (pin[i]) {
-						*pcache |= 1 << gpionum;
+						reg |= ((1 << i) << (con * IO_MAX_KEY));
+					}
+					else {
+						reg &= ~((1 << i) << (con * IO_MAX_KEY));
 					}
 				}
 			}
+			memcpy(&m_RegOP, &reg, 4);
 		}
 		if (bhwSync) ftStatus = WriteReg(REG_PORT) ? S_OK : ERROR_WRITE_FAULT;
 	}
@@ -169,15 +170,15 @@ LRESULT CPca9505::SyncIO(int mode, int con, IO_OP* op, BOOL bhwSync)
 		
 		if (con == IO_CON_GPIO) {
 			op->val.v.gpio.bit = 0xff;
-			op->val.v.gpio.val = m_RegOP[4];
+			op->val.v.gpio.val = m_RegOP[3];
 		}
 		else {
 			if (op->ext_val == NULL) op->ext_val = op->val.v.pin;
-			BYTE* pcache = &m_RegOP[regbase];
-			int gpiobase = (con % 2) * IO_MAX_KEY;
+			DWORD reg;
+			memcpy(&reg, &m_RegOP, 4);
 			for (int i = 0; i < IO_MAX_KEY; i++) {
-				int gpionum = gpiobase + i;
-				op->ext_val[i] = (*pcache & (1 << gpionum) )? 1 : 0;
+				DWORD tmp = (1 << i) << (con * IO_MAX_KEY);
+				op->ext_val[i] = ((reg & tmp ) != 0 )? 1 : 0 ;
 			}
 		}
 	}
@@ -278,16 +279,17 @@ void load_reg_table(JsonValue & jreg, REG_TABLE_LIST_T& reg_list) {
 }
 
 void logList(const char * info, std::vector<BYTE>& vlist) {
-	stringstream sinfo;
-	sinfo << info<< ":[";
+	char slog[128];
+	sprintf(slog, "[");
+	char* p = &slog[1];
 	for (auto v: vlist) {
-		sinfo << hex << (int)v << ",";
+		sprintf(p, "%02X,", v);
+		p += 3;
 	}
-	sinfo << "]";
-	char log[128];
-	sinfo >> log;
-	USES_CONVERSION;
-	logInfo(A2W(log));
+	sprintf(p - 1, "]\n");
+	FdtiPrint(slog);
+	//USES_CONVERSION;
+	//logInfo(A2W(log));
 }
 
 
@@ -309,9 +311,9 @@ void json_proc_dev ( JsonValue & jdev , CHIP_TAB_LIST_T& chiplist) {
 
 }
 
-void CPca9505::load_script(char* script, CHIP_TAB_LIST_T& chiplist) {
+LRESULT CPca9505::load_script(char* script, CHIP_TAB_LIST_T& chiplist) {
 	FILE* fp = fopen(script, "rb");
-	if (fp == NULL) return;
+	if (fp == NULL) return ERROR_NOT_FOUND;
 	DWORD flen = fsize(fp);
 	DWORD dBufferLength_string = 512;
 	std::vector<char> stringBuff(flen);
@@ -333,11 +335,16 @@ void CPca9505::load_script(char* script, CHIP_TAB_LIST_T& chiplist) {
 	else {
 		json_proc_dev(devs, chiplist);
 	}
+	return S_OK;
 }
-
+#include "util.h"
 void CPca9505::RunScript(char* script)
 {
-	load_script(script, m_chip_list);
+	int ret = load_script(script, m_chip_list);
+	if (ret != S_OK) {
+		CString serr = ErrorString(ret);
+		logError(serr);
+	}
 	Run(&m_chip_list);
 
 }
@@ -349,13 +356,14 @@ LRESULT CPca9505::Run(void* p_op)
 		for (auto chipid : chip.chipid)
 		{
 			chipid |= 0x20;
-			logInfo(L"ChipID %X:", chipid);
+			FdtiPrint("ChipID %X: ", chipid);
 			for (auto& it : chip.reg_table) {
 				const char* tips[] = { "Reg(write):","Reg(setbit):","Reg(clrbit):","Reg(read):" };
-				logInfo(L"   %S [%X]=>", tips[it.op], it.addr);
+				FdtiPrint("   %s [%X]=>", tips[it.op], it.addr);
 				BYTE regAddr = it.addr | REG_AUTO_INC;
 				logList("    Data:", it.val);
-				BYTE cache[IO_GROUP_MAX];
+				//BYTE cache[IO_GROUP_MAX];
+				BYTE * cache = (it.addr == REG_PORT_ADDR )? m_RegOP : m_RegICO ;
 				if (it.op == REG_OP_WRITE) {
 					memcpy(cache, &it.val[0], it.val.size());
 				}
@@ -368,10 +376,11 @@ LRESULT CPca9505::Run(void* p_op)
 						else if (it.op == REG_OP_CLRBIT)
 							cache[i] &= it.val[i];
 						else
-							cout << ((i == 0) ? "0x" : ",0x") << hex << (int)cache[i];
+							FdtiPrint("%c0x%02X", (i == 0) ? ' ' : ',', (DWORD)cache[i]);
 					}
+					
 					if (it.op == REG_OP_READ) {
-						cout << endl;
+						FdtiPrint("\n");
 						continue;
 					}
 				}

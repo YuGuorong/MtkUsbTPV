@@ -13,7 +13,14 @@
 #define new DEBUG_NEW
 #endif
 
-#define DEBUG_ARG 1
+#ifdef _DEBUG
+#define DEBUG_ARG 0
+#else
+#define DEBUG_ARG 0
+#endif
+#define WM_QUERY_CONNECT  (WM_USER+1531)
+LRESULT SendBoardMessage(const char* msg);
+
 // 唯一的应用程序对象
 CWinApp theApp;
 using namespace std;
@@ -34,6 +41,8 @@ using namespace std;
 #define CMD_SEL_MASTER 'm'
 #define CMD_RUN_SCRIPT 'R'
 
+
+Print_T  FdtiPrint = printf;
 
 const char* optstring = "vdluhg:i:c:o:k:p:s:r:m:R:";
 //required_argument
@@ -103,27 +112,27 @@ char* testarg[] =
 
 void showHelp(char* app)
 {
-    printf("usage %s [-h] [-i INDEX} [-g GPIO] [--gpio0~7 GPIOx] [-c CON] [-o HOME] [-k KCOL] [-p PWRKEY] [-r RAW_VALUE]\r\n"
+    FdtiPrint("usage %s [-h] [-i INDEX} [-g GPIO] [--gpio0~7 GPIOx] [-c CON] [-o HOME] [-k KCOL] [-p PWRKEY] [-r RAW_VALUE]\r\n"
         "                  [| -s | -d | -l | u | v ]\r\n", app);
-    printf("optional arguments:\r\n");
-    printf("  -h, --help              Show this help message and exit\r\n");
-    printf("  -i INDEX, --interface INDEX\r\n");
-    printf("                          Specify the board interface to be controlled (default 0)\r\n");
-    printf("  -g GPIO                 Specify output GPIO(8bit)  (default 0)\r\n");
-    printf("  --gpio0~7 GPIOx         Specify output GPIO0~GPIO7 (default 0)\r\n");
-    printf("  -c CON, --con CON       Specify CON0~CON7 connector to be controlled, CON=-1 means all(default -1)\r\n");
-    printf("  -o HOME, --home HOME    Specify HOMEKEY output of CON(0:LOW, 1:HIGH)\r\n");
-    printf("  -k KCOL, --kcol KCOL    Specify KCOL0 output of CON(0:LOW, 1:HIGH)\r\n");
-    printf("  -p PWRKEY, --pwrkey PWRKEY\r\n");
-    printf("                          Specify  PWRKEY output of CON(0:LOW, 1:HIGH)\r\n");
-    printf("  -r RAW_VALUE, --raw RAW_VALUE\r\n");
-    printf("                          Specify all CONs to a specify value, each CON has 3 bits for\r\n");
-    printf("                          HOOMEKEY_KCOL0_PWEKEY(LSB)\r\n");
-    printf("  -s, --set               Specify the output of the selected keys on CON\r\n");
-    printf("  -d, --display           Show the status of CONs, CONs=9 show GPIO, CON=-1 means all(default -1) \r\n");
-    printf("  -l, --list              Show connected FT2322 devices\r\n");
-    printf("  -u, --gui               Show the dialog of FT2322 devices control\r\n");
-    printf("  -v, --version           Show version information\r\n");
+    FdtiPrint("optional arguments:\r\n");
+    FdtiPrint("  -h, --help              Show this help message and exit\r\n");
+    FdtiPrint("  -i INDEX, --interface INDEX\r\n");
+    FdtiPrint("                          Specify the board interface to be controlled (default 0)\r\n");
+    FdtiPrint("  -g GPIO                 Specify output GPIO(8bit)  (default 0)\r\n");
+    FdtiPrint("  --gpio0~7 GPIOx         Specify output GPIO0~GPIO7 (default 0)\r\n");
+    FdtiPrint("  -c CON, --con CON       Specify CON0~CON7 connector to be controlled, CON=-1 means all(default -1)\r\n");
+    FdtiPrint("  -o HOME, --home HOME    Specify HOMEKEY output of CON(0:LOW, 1:HIGH)\r\n");
+    FdtiPrint("  -k KCOL, --kcol KCOL    Specify KCOL0 output of CON(0:LOW, 1:HIGH)\r\n");
+    FdtiPrint("  -p PWRKEY, --pwrkey PWRKEY\r\n");
+    FdtiPrint("                          Specify  PWRKEY output of CON(0:LOW, 1:HIGH)\r\n");
+    FdtiPrint("  -r RAW_VALUE, --raw RAW_VALUE\r\n");
+    FdtiPrint("                          Specify all CONs to a specify value, each CON has 3 bits for\r\n");
+    FdtiPrint("                          HOOMEKEY_KCOL0_PWEKEY(LSB)\r\n");
+    FdtiPrint("  -s, --set               Specify the output of the selected keys on CON\r\n");
+    FdtiPrint("  -d, --display           Show the status of CONs, CONs=9 show GPIO, CON=-1 means all(default -1) \r\n");
+    FdtiPrint("  -l, --list              Show connected FT2322 devices\r\n");
+    FdtiPrint("  -u, --gui               Show the dialog of FT2322 devices control\r\n");
+    FdtiPrint("  -v, --version           Show version information\r\n");
 }
 
 
@@ -139,13 +148,17 @@ LRESULT ProcIOReq(CTpvBoard * pboard, IO_OP& cur_req, vector<IO_OP>& io_reqQue) 
         io_reqQue.clear();
         //cur_req = def_request;
     }
+    else
+    {
+        FdtiPrint("Board not ready!\n");
+    }
 
     return 0;
 }
 
-void DisplayConn(CTpvBoard * board, char con, int index) {
+void DisplayConn(CTpvBoard * board, char con, int index, int master) {
     if (board == NULL) {
-        printf("not found the index board: %d ", index);
+        FdtiPrint("Board not found!\n");
     }
     else {
         if (con == IO_CON_UNKNOWN) con = IO_ALL_CON;
@@ -153,12 +166,12 @@ void DisplayConn(CTpvBoard * board, char con, int index) {
         IO_VAL ioval[IO_CON_MAX+4];
         board->Display((int)con, ioval, &items);
 
-        printf("[Board_%d] status:\n", index);
+        FdtiPrint("%s Board status:\n", master == 0 ? "Master" : "Slave");
         BOOL hdrPrinted = FALSE;
         for (int i = 0; i < items; i++) {
             if (ioval[i].con == IO_CON_GPIO) {
                 BYTE v = ioval[i].v.gpio.val;
-                printf("GPIO:  7  6  5  4 - 3  2  1  0\n"
+                FdtiPrint("GPIO:  7  6  5  4 - 3  2  1  0\n"
                     "       %d  %d  %d  %d - %d  %d  %d  %d\n",
                     !(!(v & 0x80)), !(!(v & 0x40)), !(!(v & 0x20)), !(!(v & 0x10)),
                     !(!(v & 0x8)), !(!(v & 0x4)), !(!(v & 0x2)), !(!(v & 0x1)) );
@@ -166,11 +179,11 @@ void DisplayConn(CTpvBoard * board, char con, int index) {
             else {
                 if (hdrPrinted == FALSE) {
                     hdrPrinted = TRUE;
-                    printf("      | HOME | KCOL | PWRKEY| \n");
-                    //printf("------------------------------\n");
+                    FdtiPrint("      | HOME | KCOL | PWRKEY| \n");
+                    //FdtiPrint("------------------------------\n");
                 }
                 char* pv = ioval[i].v.pin;
-                printf("CON%d: |   %d  |   %d  |   %d   |\n", 
+                FdtiPrint("CON%d: |   %d  |   %d  |   %d   |\n", 
                     ioval[i].con, pv[IO_HOME], pv[IO_KCOL], pv[IO_PWRKEY]);
             }
             
@@ -181,7 +194,7 @@ void DisplayConn(CTpvBoard * board, char con, int index) {
 
 BOOL ChkIdx(int index) {
     if (index < 0) {
-        printf("Please specify the board index before other parameter!!\r\n");
+        FdtiPrint("Please specify the board index before other parameter!!\r\n");
         SetFaultError(ERROR_INVALID_ADDRESS);
         return FALSE;
     }
@@ -191,31 +204,34 @@ BOOL ChkIdx(int index) {
 
 
 
-int server_entry(int argc, char** argv)
+int server_entry(CTpvBoard* pboard ,int argc, char** argv, BOOL isServer)
 {
     int nRetCode = 0;
     LRESULT err;
     InitLog();
-    CFtdiDriver  drvFdti;
-    drvFdti.Scan(FALSE);
-    drvFdti.MountDevices();
+    if (isServer == FALSE && pboard == NULL) {
+        CFtdiDriver  drvFdti;
+        drvFdti.Scan(FALSE);
+        drvFdti.MountDevices();
+    }
 
     int opt;
     int digit_optind = 0;
     int option_index = 0;
-    int boardindex = -1;
+    int boardindex = (isServer) ?  0 : -1;
     int master = 0;
 
     vector<IO_OP>io_reqQue;
     
     IO_OP cur_req = def_request;
     IO_OP qk_req = def_request;
-
-    CTpvBoard* pboard = NULL;
-
+    cur_req.index = boardindex;
+    //qk_req.index = boardindex;
+    
+    if (pboard) cur_req.index = 0;
     if (argc <= 1) {
-        {CMainFrame dlg; dlg.DoModal();     }
-        //showHelp(argv[0]);
+        //{CMainFrame dlg; dlg.DoModal();     }
+        showHelp(argv[0]);
         return 1;
     }
     optind = 0;
@@ -228,13 +244,15 @@ int server_entry(int argc, char** argv)
         switch (opt) {
         case PARAM_INDEX:
             ProcIOReq(pboard, cur_req, io_reqQue);
-            cur_req.index = argval;
-            boardindex = argval;
-            pboard = drvFdti.FindBoard(0, argval, &err);
-            if ( pboard ) 
-                pboard->SelMaster(master);
-            else
-                SetFaultError(err);
+            if (!isServer) {
+                cur_req.index = argval;
+                boardindex = argval;
+                pboard = CFtdiDriver::GetDriver()->FindBoard(argval, argval, &err);
+                if (pboard)
+                    pboard->SelMaster(master);
+                else
+                    SetFaultError(err);
+            }
              break;
         case PARAM_CON:
             if (optarg == NULL) argval = -1;
@@ -251,10 +269,10 @@ int server_entry(int argc, char** argv)
         case PARAM_PWRKEY: if (CHKIDX()) cur_req.val.v.pin[IO_PWRKEY] = argval; break;
         case PARAM_RAWVAL: if (CHKIDX()) qk_req=cur_req, qk_req.val.v.raw=atox(optarg, 1), qk_req.val.fmt= CON_RAW;  break;
         case PARAM_SETVAL: if (CHKIDX()) qk_req = cur_req, qk_req.val.v.raw = argval == 0 ? 0 : 0xFF, qk_req.val.fmt = IO_RAW; break;
-        case CMD_DISPLAY:  if (CHKIDX()) ProcIOReq(pboard, cur_req, io_reqQue);  DisplayConn(pboard, cur_req.val.con, boardindex); break;
-        case CMD_LISTDEV: drvFdti.ShowDevices(); break;
+        case CMD_DISPLAY:  if (CHKIDX()) ProcIOReq(pboard, cur_req, io_reqQue);  DisplayConn(pboard, cur_req.val.con, boardindex, master); break;
+        case CMD_LISTDEV: CFtdiDriver::GetDriver()->ShowDevices(); break;
         case CMD_GUI:     {CMainFrame dlg; dlg.DoModal();     }        break;
-        case CMD_VERSION: printf("version : 2.0.0.1\r\n"); break;
+        case CMD_VERSION: FdtiPrint("version : %S\r\n", (LPCTSTR)GetSWVersion()); break;
         case PARAM_GPIO:  
             if (CHKIDX()) {
                 qk_req = cur_req;
@@ -274,9 +292,9 @@ int server_entry(int argc, char** argv)
             }
             break;
         case CMD_RUN_SCRIPT:
-            if (pboard == NULL) {
+            if (!isServer && pboard == NULL) {
                 cur_req.index =  boardindex = 0;
-                pboard = drvFdti.FindBoard(0, boardindex, &err);
+                pboard = CFtdiDriver::GetDriver()->FindBoard(0, boardindex, &err);
             }
             if( pboard ) pboard->RunScript(optarg);
             break;
@@ -294,6 +312,7 @@ int server_entry(int argc, char** argv)
         if (qk_req.index != -1 ) {
             io_reqQue.push_back(qk_req);
             qk_req = def_request;
+            qk_req.index = boardindex;
         }
 
         if (err = GetFaultError()) {
@@ -333,12 +352,12 @@ void CreateDumpFile(LPCWSTR lpstrDumpFilePathName, EXCEPTION_POINTERS* pExceptio
 LONG ApplicationCrashHandler(EXCEPTION_POINTERS* pException)
 {
     CreateDumpFile(L"crash.dmp", pException);
-    printf("异常已记录到文件：crash.dmp");
+    FdtiPrint("异常已记录到文件：crash.dmp");
     system("pause");
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-CString GetExeName(HMODULE hModule) {
+CString GetExeName(HMODULE hModule, CString &strpath) {
     if(hModule == NULL )
         hModule = ::GetModuleHandle(nullptr);
 
@@ -347,7 +366,9 @@ CString GetExeName(HMODULE hModule) {
     DWORD len = ::GetModuleFileName(hModule, psn, MAX_PATH);
     psn[len] = 0;
     sfname.ReleaseBuffer();
-    sfname.Delete(0, sfname.ReverseFind('\\') + 1);
+    int pos = sfname.ReverseFind('\\');
+    strpath = sfname.Left(pos);
+    sfname.Delete(0, pos + 1);
     
     return sfname;
 }
@@ -366,26 +387,30 @@ int getParamVal(const char * str) {
 
 
 void show_i2c_tools_help(LPCTSTR exename) {
-    logError(L"Usage of tool:\n");
-    printf("%S {option} {chip_addr} {reg_addr: reg_value...t} ...\n", exename);
-    printf("option: [w/write/r/read/s/setbit/c/clrbit]\n");
-    printf("        w/write:  Direct write value to spec chip 9505 registers\n");
-    printf("        r/read:   Direct read the spec chip 9505 registers\n");
-    printf("        s/setbit: Read spec 9505 addr register value and set+write-back one/multi bits\n");
-    printf("        c/clrbit: Read spec 9505 addr register value and clear+write-back one/multi bits\n");
-    printf("chip_addr: one or more chip i2c address, separated by commas\n");
-    printf("reg_addr: The start address of register\n");
-    printf("reg_value:The list of register value to be write, separated by commas\n");
-    printf("\n");
+    logError(L"Usage of Ftdi_i2c_tool :\n");
+    FdtiPrint("%S [-j jsonfile] {operat,[chip_addr], reg_addr: [reg_value...]} ...\n", exename);
+    FdtiPrint("-j:       Initialize registers by descript a json file.\n");
+    FdtiPrint("operat:   [w/write/r/read/s/setbit/c/clrbit]\n");
+    FdtiPrint("           w/write:  Direct write value to spec chip 9505 registers\n");
+    FdtiPrint("           r/read:   Direct read the spec chip 9505 registers\n");
+    FdtiPrint("           s/setbit: Read spec 9505 addr register value and set+write-back one/multi bits\n");
+    FdtiPrint("           c/clrbit: Read spec 9505 addr register value and clear+write-back one/multi bits\n");
+    FdtiPrint("chip_addr:The chip i2c addresses, If group by square brackets ,each chip separated by commas. Otherwise means single address.\n");
+    FdtiPrint("reg_addr: The start address of register\n");
+    FdtiPrint("reg_value:The list of register value to be writen, separated by commas,group by square brackets\n");
+    FdtiPrint("\nNote: Each group braces defined an i2c operation. There is no limit on i2c operation groups\n");
+    FdtiPrint("\n");
 }
 
 #include "CPca9505.h"
 CHIP_TAB_LIST_T chip_op_arg;
 const char* cmdlist[] = {  "write",  "setbit",  "clrbit", "read" };
 int get_cmd(const char* str) {
+    CStringA scmd = str;
+    scmd.Trim();
     for (int i = 0; i < sizeof(cmdlist) / sizeof(const char*); i++) {
-        if (str[0] == cmdlist[i][0]) {
-            if (str[1] == 0 || str[1] == 0 || strcmp(str, cmdlist[i]) == 0) {
+        if (scmd[0] == cmdlist[i][0]) {
+            if (scmd[1] == 0 || scmd[1] == 0 || strcmp(scmd, cmdlist[i]) == 0) {
                 return i;
             }
         }
@@ -499,24 +524,25 @@ char * move_next(char*& ptr, char* &pnext) {
     return ptr ;
 }
 
-void load_json(CHIP_TAB_LIST_T& chiplist, const char* cmdline) {
-    const char* pjson = strstr(cmdline, "-i");
+LRESULT load_json(CHIP_TAB_LIST_T& chiplist, const char* cmdline) {
+    const char* pjson = strstr(cmdline, "-j");
     if (pjson) {
-        pjson += strspn(pjson, " -i");
+        pjson += strspn(pjson, " -j");
         const char* pe = pjson + strcspn(pjson, " ,");
         char jname[256];
         memcpy(jname, pjson, pe - pjson);
         jname[pe - pjson] = 0;
-        CPca9505::load_script(jname, chiplist);
+        return CPca9505::load_script(jname, chiplist);
     }
+    return S_OK;
 }
 ////test.exe {w,0x26,0,[1,3,2]}, {s,0x3}
 int parseOneLine(CHIP_TAB_LIST_T& chiplist, const char* cmdline) {
     char str[256];
     int offset = 0;
     int len = 0;
-    load_json(chiplist, cmdline);
-
+    LRESULT ret = S_OK;
+    if ((ret = load_json(chiplist, cmdline)) != S_OK) return ret;
     while ((len = load_sub_string(str, &cmdline[offset], "{}") ) > 0 ) {
         offset += len;
 
@@ -526,16 +552,16 @@ int parseOneLine(CHIP_TAB_LIST_T& chiplist, const char* cmdline) {
         char* pnext = strchr(ptr, ',') ;
         *pnext = '\0';
         int icmd = get_cmd(ptr);
-        if (icmd == -1) return -1;
+        if (icmd == -1) return (chiplist.size())? S_OK : ERROR_INVALID_COMMAND_LINE;
 
         load_list(chip.chipid, move_next(ptr, pnext));
 
-        if (pnext == nullptr) return -1;
+        if (pnext == nullptr) return ERROR_INVALID_COMMAND_LINE;
         move_next(ptr, pnext);
         reg.addr = getParamVal(ptr);
 
         if (icmd != REG_OP_READ) {
-            if (pnext == nullptr) return -1;
+            if (pnext == nullptr) return ERROR_INVALID_COMMAND_LINE;
             load_list(reg.val, move_next(ptr, pnext));
         }
 
@@ -543,64 +569,211 @@ int parseOneLine(CHIP_TAB_LIST_T& chiplist, const char* cmdline) {
         chip.reg_table.push_back(reg);
         chiplist.push_back(chip);
     }
-    return 0;
+    return S_OK;
 }
+
+int connectpipe(HANDLE &pipe ) {
+    //cout << __func__ << "/" << __LINE__ << endl;
+    //printf("Connect to Server ...\n");
+    if (WaitNamedPipe(PRINT_PIPE_NAME, 3000) == FALSE) {
+        printf("Reset and connect to server...\n");
+        SendBoardMessage("pipe_reset\n0\n");
+        if (WaitNamedPipe(PRINT_PIPE_NAME, 10000) == FALSE) {
+            printf("wait pipe failed!/n");
+            return -1;
+        }
+    }
+    
+    pipe = CreateFile(PRINT_PIPE_NAME, GENERIC_READ | GENERIC_WRITE, 0,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (pipe == INVALID_HANDLE_VALUE) pipe = 0;
+    if (pipe == 0) {
+        printf("can not ope pipe!");
+        return -1;
+    }
+    //cout << __func__ << "/" << __LINE__ << endl;
+    return S_OK;
+}
+
+void localprint(void* param) {
+
+    HANDLE* phPipe = (HANDLE*)param;
+    if (*phPipe == 0) return;
+    char buff[1025];
+    DWORD rxb = 0;
+    ;
+    while (ReadFile(*phPipe, buff, 1024, &rxb, NULL) && rxb) {
+        buff[rxb] = 0;
+        printf("%s", buff);
+    }
+    CloseHandle(*phPipe);
+    *phPipe = 0;
+    //cout << __func__ << "/" << __LINE__ << endl;
+}
+HANDLE m_hEvtMsg;
+HWND  m_hMsgWnd = NULL;
+HANDLE hpipe = 0;
+INT conn = 0;
+
+int GetConnectState() {
+    conn = ::SendMessage(m_hMsgWnd, WM_QUERY_CONNECT, 0, 0);
+    return conn;
+}
+
+INT connect_server(DWORD nTimeOut) {
+    DWORD64 ticktimeout = ::GetTickCount64() + nTimeOut + 1;
+    while(::GetTickCount64() < ticktimeout){
+        //cout << __func__ << "/" << __LINE__ << endl;
+        if ((m_hMsgWnd = ::FindWindow(NULL, NAME_WND_MSG_MAIN)) != NULL) {
+            //cout << "find window and event [";
+            //cout << __func__ << "/" << __LINE__ << endl;
+            do{
+                if (GetConnectState() >= SCAN_DONE) break;
+                //printf("conn query ret:%d\n", conn);
+                Sleep(50);
+            } while (::GetTickCount64() < ticktimeout );
+            if( hpipe == 0 && connectpipe(hpipe) == S_OK)
+                _beginthread(localprint, 1024, &hpipe);
+            //cout << __func__ << "/" << __LINE__ << endl;
+            return hpipe ==0 ? ERROR_PIPE_BUSY : S_OK;
+        }
+        DWORD sleeptick = (nTimeOut > 100) ? 100 : nTimeOut;
+        Sleep(sleeptick);
+    }
+    //cout << __func__ << "/" << __LINE__ << endl;
+    return ERROR_TIMEOUT;
+}
+
+LRESULT SendBoardMessage(const char* msg) {
+    int slen = strlen(msg) + 1;
+    char* pmsg = new char[slen];
+    strcpy(pmsg, msg);
+    COPYDATASTRUCT cds;
+    cds.dwData = slen;
+    cds.cbData = slen;
+    cds.lpData = pmsg;
+    LRESULT val = ::SendMessage(m_hMsgWnd, WM_COPYDATA, 0, (WPARAM)&cds);
+    delete[] pmsg;
+    return val;
+}
+
+
+
+int backgrd_server(CString &sfname, CString &spath) {
+    if (connect_server(NMPWAIT_NOWAIT) == ERROR_TIMEOUT ) {
+        RunProc(sfname, L"server run", spath, FALSE, TRUE);
+    }
+    if ( (hpipe) || (connect_server(60000) == S_OK)) {
+        return S_OK;
+    }
+    FdtiPrint("Connect Server failed!\n");
+    return -1;
+}
+
+#include<conio.h>
+#include "CMainDlg.h"
+CStringA sExeName;
 
 int main(int argc, char* argv[])
 {
    //test.exe {w,0x26,0,[1,3,2]}, {s,0x3}
-
-    char* testa[] = { "test", "w","0x26", "0x18", "[0x11,", "15", ",","7,", ",","3]"};
- 
     SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)ApplicationCrashHandler);
+    
 
     HMODULE hModule = ::GetModuleHandle(nullptr);
-
     if (hModule == nullptr)
     {   // TODO: 更改错误代码以符合需要
         wprintf(L"错误: GetModuleHandle 失败\n");
         return 1;
     }
-    _CrtMemState s1, s2, s3;
-    _CrtMemCheckpoint(&s1);
-
 
     // 初始化 MFC 并在失败时显示错误
     if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0))
-    {
-        // TODO: 在此处为应用程序的行为编写代码。
+    {   // TODO: 在此处为应用程序的行为编写代码。
         wprintf(L"错误: MFC 初始化失败\n");
         return 1;
     }
+    CString spath, sfname;
+    sfname = GetExeName(hModule, spath);
+    sExeName = qUnc2Utf((LPCTSTR)sfname);
+    LRESULT ret = S_OK;
+    const char* p = ::GetCommandLineA();
+    const char* pp = NULL;
+    while ((pp = strchr(p, '\\')) != nullptr)  p = pp + 1;
+    pp = p + strcspn(p, " \t");
+    pp += strspn(pp, " \t");
 
-    //tools write/read/setbit/clrbit chipaddr  regaddr [values]
-    CString sfname = GetExeName(hModule);
-    if (sfname.CompareNoCase(L"FtdiUsbTpv.exe") == 0) {
-        //if (sfname.CompareNoCase(L"Ftdi_I2c_Tool.exe") == 0) {
-        CHIP_TAB_LIST_T chiplist;
-        const char* p = ::GetCommandLineA();
-#if DEBUG_ARG
-        argc = sizeof(testa) / sizeof(char*);
-        argv = testa;
-        p = "\\mtk_USBTPV\\USBTPV\\MtkUsbTPV\\Debug\\FtdiUsbTpv.exe  -i test.json "
-            "{w,[0x0,0x1],0x18,[0,0,0,0,0]},"
-            "{w,[0x0,0x1],0x8,[0x20, 0x00, 0, 0, 0]} "
-            "{s,0x0,0x8,[0x40, 0x80, 0x14, 0x10, 0x10]}"
-            "{c,0x0,0x8,[0x20, 0x80, 0x10, 0x00, 0x10]}"
-            "{r,0x0,0x8}";
-#endif
-        if (strchr(p, '{') != nullptr) 
-            parseOneLine(chiplist, p);
-        else {
-            int errpos = 0;
-            if (argc < 3 || (errpos = parseargs(chiplist, argc, argv)) != 0) {
-                if (errpos) printf("Parse command paramter fail at %dth parameter\n", errpos);
+    if (strstr(pp, "keyval") != nullptr) {
+        int key = _getch();
+        return key;
+    }
+    else if (strstr(pp, "server") != nullptr ) {
+        const char* ps = strstr(pp, "server");
+        if (ps != nullptr) {
+            ps += strspn(ps + 6, " \t") + 6;
+            if (strstr(ps, "run") == ps) {
+                CMainDlg dlg;
+                return (dlg.DoModal() == IDOK) ? 0 : -1;
+            }
+            else if (strstr(ps, "stop") == ps) {
+                if (connect_server(1000) == S_OK) {
+                    SendBoardMessage("stop\n stop");
+                    return 0;
+                }
+                return -1;
+            }
+            else if (strstr(ps, "start") == ps) {
+                backgrd_server(sfname, spath);
+                return 0;
+            }
+            else {
                 show_i2c_tools_help(sfname);
                 return -1;
             }
         }
+    }
+    else {
+        backgrd_server(sfname, spath);
+    }
 
-        LRESULT err;
+#if DEBUG_ARG
+    argc = sizeof(testarg) / sizeof(char*);
+    argv = testarg;
+
+    p = "\\mtk_USBTPV\\USBTPV\\MtkUsbTPV\\Debug\\Ftdi_i2c_tool.exe  -j test.json "\
+        "{w,[0x0,0x1],0x18,[0,0,0,0,0]},"\
+        "{w,[0x0,0x1],0x8,[0x20, 0x00, 0, 0, 0]} "\
+        "{s,0x0,0x8,[0x40, 0x80, 0x14, 0x10, 0x10]}"\
+        "{c,0x0,0x8,[0x20, 0x80, 0x10, 0x00, 0x10]}"\
+        "{r,0x0,0x8}";
+#endif
+    
+    CHIP_TAB_LIST_T chiplist;
+    if (strstr(p, "reset") != nullptr) {
+        SendBoardMessage("reset\n0\n");
+        CancelIo(hpipe);
+        Sleep(50);
+        return 0;
+    }
+    if (strchr(p, '{') != nullptr || strstr(p, "-j") != nullptr) {
+        logInfo(L"i2c param %S\n", p);
+        if ((ret = parseOneLine(chiplist, p)) != S_OK) {
+            wprintf(L"Fault error[%d]: (%s)", ret, (LPCTSTR)ErrorString(ret));
+            show_i2c_tools_help(sfname);
+            CancelIo(hpipe);
+            Sleep(50);
+            return -1;
+        }
+        
+
+        std::string str;
+        str = "run\n";
+        str += pp;
+        SendBoardMessage(str.c_str());
+
+        CancelIo(hpipe);
+        Sleep(50);
+        /*LRESULT err;
         InitLog();
         CFtdiDriver  drvFdti;
         drvFdti.Scan(FALSE);
@@ -608,27 +781,23 @@ int main(int argc, char* argv[])
         CTpvBoard* pboard = NULL;
 
         pboard = drvFdti.FindBoard(0, 0, &err);
-        if (pboard) return pboard->Run(&chiplist);
+        if (pboard) return pboard->Run(&chiplist);*/
         return -1;
     }
-    else {
-
+    else  {
         //::AfxInitRichEdit2();
-        //_CrtSetBreakAlloc(132); //383为上面内存泄漏的块号.
-#if DEBUG_ARG
-        argc = sizeof(testarg) / sizeof(char*);
-        int ret = server_entry(argc, testarg);
-#else
-        int ret = server_entry(argc, argv);
-#endif
+        //int ret = server_entry(NULL, argc, argv, FALSE);
 
-        _CrtMemCheckpoint(&s2);
-
-        if (_CrtMemDifference(&s3, &s1, &s2)) {
-            _CrtMemDumpStatistics(&s3);
-            _CrtDumpMemoryLeaks();
+        std::string sarg = "step\n";
+        for (int i = 1; i < argc; i++) {
+            sarg += argv[i];
+            sarg += "\n";
         }
+        SendBoardMessage(sarg.c_str());
+        CancelIo(hpipe);
+        Sleep(50);
         return ret;
     }
     
 }
+

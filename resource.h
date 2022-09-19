@@ -8,8 +8,11 @@
 #define IDS_APP_TITLE                   103
 #define IDD_TIP_DLG                     104
 #define IDP_SOCKETS_INIT_FAILED         104
+#define IDR_TRAY_MENU                   104
 #define IDD_PANNEL                      105
-#define IDR_MAINFRAME                   128
+#define IDD_CMainDlg                    106
+#define IDI_BOARD                       129
+#define IDI_NO_BOARD                    130
 #define IDD_SUBPANEL_DLG                130
 #define IDD_MAIN_FRAME                  131
 #define IDB_PNG_SWOFF                   134
@@ -90,14 +93,20 @@
 #define IDC_STATIC_G7                   1066
 #define IDC_STATIC_G8                   1067
 #define IDC_STATIC0                     1068
+#define ID_M_M                          40001
+#define ID_M_M40002                     40002
+#define ID_M_40003                      40003
+#define ID_M_EXIT                       40004
+#define ID_M_40005                      40005
+#define ID_M_TOGGLE_WND                 40006
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        103
-#define _APS_NEXT_COMMAND_VALUE         40001
+#define _APS_NEXT_RESOURCE_VALUE        107
+#define _APS_NEXT_COMMAND_VALUE         40007
 #define _APS_NEXT_CONTROL_VALUE         1069
-#define _APS_NEXT_SYMED_VALUE           105
+#define _APS_NEXT_SYMED_VALUE           107
 #endif
 #endif

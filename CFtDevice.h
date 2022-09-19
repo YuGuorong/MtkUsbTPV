@@ -6,7 +6,6 @@
 #include "CFdtiDriver.h"
 #include "log.h"
 
-
 class CFtDevice
 {
 public:
@@ -45,6 +44,7 @@ public:
 	virtual void SetAttribute(char* attr, int id);
 	virtual void RunScript(char* script);
 	virtual LRESULT Run(void* chip_op);
+	virtual LRESULT Reset(BYTE bitpos);
 };
 
 

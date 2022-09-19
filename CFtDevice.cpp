@@ -666,3 +666,18 @@ LRESULT CFtDevice::Run(void* chip_op)
 {
 	return LRESULT(0);
 }
+
+LRESULT CFtDevice::Reset(BYTE bitpos)
+{
+	LRESULT ret = CFtDevice::UpdateRaw();
+	if (ret == S_OK) {
+		m_lowByte &= ~(1 << bitpos);
+		if ((ret = CFtDevice::Write(1)) == S_OK) {
+			Sleep(1000);
+			m_lowByte |= (1 << bitpos);
+			ret = CFtDevice::Write(1);
+		}
+	}
+	return ret;
+}
+

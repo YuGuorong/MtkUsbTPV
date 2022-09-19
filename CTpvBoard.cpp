@@ -165,4 +165,13 @@ LRESULT CTpvBoard::Run(void * chip_op)
 	return S_OK;
 }
 
+#define RESET_PIN 4
+LRESULT CTpvBoard::Reset(void)
+{
+	for (int i = 0; i < m_deviceNum; i++) {
+		(m_Devices[i])->Reset(RESET_PIN);
+	}
+	return LRESULT();
+}
+
 

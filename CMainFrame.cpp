@@ -27,7 +27,7 @@ IMPLEMENT_DYNAMIC(CMainFrame, CExDialog)
 CMainFrame::CMainFrame(CWnd* pParent /*=nullptr*/)
 	: CExDialog(IDD_MAIN_FRAME, pParent)
 {
-	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	m_hIcon = AfxGetApp()->LoadIcon(IDI_BOARD);
 	MAX_PANNEL_NUM = 4;
 	TCHAR val[64];
 	//int reg =  ReadReg(L"USBTPV_SET", L"MAX_PANNEL_MAX", val);
